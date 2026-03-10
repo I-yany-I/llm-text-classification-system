@@ -2,6 +2,7 @@ from transformers import Trainer, TrainingArguments
 from datasets import load_dataset
 from transformers import AutoTokenizer
 from model import load_model
+from lora_model import load_lora_model
 
 
 def prepare_dataset():
@@ -27,7 +28,15 @@ def train():
 
     dataset = prepare_dataset()
 
-    model = load_model()
+# --------------------------------------------------------
+    # 1 Fine-tuning(Baseline BERT)
+    # model = load_model()
+
+# -------------------------------------------------------------
+    # 2 loRA Fine-tuning
+    model = load_lora_model()
+
+# --------------------------------------------------------------
 
     training_args = TrainingArguments(
         output_dir="./results",
