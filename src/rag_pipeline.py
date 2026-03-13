@@ -79,10 +79,16 @@ Now classify this news:
 
 {query}
 
+Answer with ONLY the category number.
 Category:
 """
 
-    result = llm(prompt, max_new_tokens=10)
+    result = llm(
+        prompt,
+        max_new_tokens=2,
+        do_sample=False
+    )
+
     return result
 
 if __name__ == "__main__":

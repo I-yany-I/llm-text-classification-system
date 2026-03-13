@@ -1,0 +1,3 @@
+Baseline BERT
+Accuracy: 0.88
+F1: 0.88
