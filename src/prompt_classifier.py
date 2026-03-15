@@ -5,7 +5,8 @@ def load_llm():
 
     classifier = pipeline(
         "text-generation",
-        model="gpt2"
+        model="Qwen/Qwen2-1.5B-Instruct",
+        device_map="auto"
     )
 
     return classifier
@@ -26,12 +27,13 @@ Sci/Tech
 Text:
 {text}
 
+Return ONLY the category name.
 Category:
 """
 
     result = classifier(
         prompt,
-        max_new_tokens=10
+        max_new_tokens=3
     )
 
     print(result)

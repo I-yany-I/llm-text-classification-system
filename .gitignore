@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
 results/
+vector_store/
 __pycache__/
 *.py[codz]
 *$py.class
