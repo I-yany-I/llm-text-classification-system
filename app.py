@@ -1,5 +1,5 @@
 import gradio as gr
-from src.rag_pipeline import load_data, build_vector_index, rag_classify, load_llm, clean_query
+from src.rag_pipeline import load_data, build_vector_index, rag_classify, load_llm
 
 print("Loading RAG system...")
 
@@ -28,18 +28,19 @@ label_map = {
     "3": "Sci/Tech"
 }
 
+
 # -------------------------
 # 前端分类函数
 # -------------------------
 def classify_news(text):
-    # 清理开头数字
-    cleaned_text = clean_query(text)
-
-    # 调用 RAG 分类
-    label_id = rag_classify(cleaned_text, texts, labels, index, embed_model, llm)
+    label_id, examples = rag_classify(text, texts, labels, index, embed_model, llm)
 
     category = label_map.get(label_id, "Unknown")
-    return f"{category} (Label {label_id})"
+
+    similar_text = "\n\n".join(examples)
+
+    return f"{category} (Label {label_id})\n\nSimilar News:\n{similar_text}"
+
 
 # -------------------------
 # Gradio 界面
