@@ -1,7 +1,6 @@
 from transformers import Trainer, TrainingArguments
 from datasets import load_dataset
 from transformers import AutoTokenizer
-from model import load_model
 from lora_model import load_lora_model
 from sklearn.metrics import f1_score, accuracy_score
 
@@ -43,7 +42,7 @@ def train():
     model = load_lora_model()
 
     training_args = TrainingArguments(
-        output_dir="./results",
+        output_dir="../results",
         learning_rate=2e-5,
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
