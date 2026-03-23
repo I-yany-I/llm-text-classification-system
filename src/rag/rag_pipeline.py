@@ -2,10 +2,11 @@ from sentence_transformers import SentenceTransformer
 from datasets import load_dataset
 import faiss
 import numpy as np
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-import torch
 import os
 import re
+
+from src.llm.shared_pipeline import load_shared_generation_pipeline
+from src.paths import VECTOR_STORE_DIR, ensure_project_dirs
 
 # -------------------------
 # 清理输入文本
@@ -31,35 +32,19 @@ def load_data():
 # 加载LLM
 # -------------------------
 def load_llm():
-
-    model_name = "Qwen/Qwen2-1.5B-Instruct"
-
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype=torch.float16,
-        device_map="auto"
-    )
-
-    llm = pipeline(
-        "text-generation",
-        model=model,
-        tokenizer=tokenizer
-    )
-
-    return llm
+    return load_shared_generation_pipeline()
 
 
 # -------------------------
 # 构建向量数据库
 # -------------------------
 def build_vector_index(texts):
+    ensure_project_dirs()
 
-    os.makedirs("vector_store", exist_ok=True)
+    os.makedirs(VECTOR_STORE_DIR, exist_ok=True)
 
-    index_file = "vector_store/faiss_index.index"
-    embeddings_file = "vector_store/embeddings.npy"
+    index_file = str(VECTOR_STORE_DIR / "faiss_index.index")
+    embeddings_file = str(VECTOR_STORE_DIR / "embeddings.npy")
 
     embed_model = SentenceTransformer("all-MiniLM-L6-v2")
 

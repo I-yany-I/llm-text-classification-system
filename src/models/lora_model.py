@@ -1,32 +1,64 @@
-from transformers import AutoModelForSequenceClassification
-from peft import LoraConfig, get_peft_model
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from peft import LoraConfig, PeftModel, TaskType, get_peft_model
+
+from src.paths import ensure_project_dirs, get_model_dir
 
 
-def load_lora_model():
+class LoRAClassifier:
 
-    model = AutoModelForSequenceClassification.from_pretrained(
-        "bert-base-uncased",
-        num_labels=4
-    )
+    def __init__(self, prefer_trained: bool = True):
+        ensure_project_dirs()
 
-    lora_config = LoraConfig(
-        r=8,
-        lora_alpha=16,
-        target_modules=["query", "value"],
-        lora_dropout=0.1,
-        bias="none",
-        task_type="SEQ_CLS"
-    )
+        self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
 
-    model = get_peft_model(model, lora_config)
+        base_model = AutoModelForSequenceClassification.from_pretrained(
+            "bert-base-uncased",
+            num_labels=4
+        )
 
-    print("LoRA model loaded!")
+        model_path = get_model_dir("lora")
 
-    return model
+        if prefer_trained and model_path.exists():
 
+            print("Loading trained LoRA model...")
 
-if __name__ == "__main__":
+            self.model = PeftModel.from_pretrained(
+                base_model,
+                str(model_path)
+            )
 
-    model = load_lora_model()
+        else:
 
-    print(model)
+            print("No trained LoRA found. Initializing new LoRA adapter...")
+
+            config = LoraConfig(
+                task_type=TaskType.SEQ_CLS,
+                inference_mode=False,
+                r=8,
+                lora_alpha=16,
+                lora_dropout=0.1,
+                target_modules=["query", "value"],
+            )
+            self.model = get_peft_model(base_model, config)
+
+        self.model.eval()
+
+    def predict(self, text):
+        return self.predict_batch([text])[0]
+
+    def predict_batch(self, texts):
+        inputs = self.tokenizer(
+            texts,
+            return_tensors="pt",
+            truncation=True,
+            padding=True,
+            max_length=128
+        )
+
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+
+        pred = torch.argmax(outputs.logits, dim=1)
+
+        return pred.tolist()

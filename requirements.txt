@@ -1,0 +1,12 @@
+accelerate
+datasets
+faiss-cpu
+gradio
+matplotlib
+numpy
+peft
+scikit-learn
+sentence-transformers
+torch
+tqdm
+transformers

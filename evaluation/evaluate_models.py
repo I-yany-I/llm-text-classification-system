@@ -1,224 +1,111 @@
+import json
+import sys
+from pathlib import Path
+
+import matplotlib.pyplot as plt
 from datasets import load_dataset
 from sklearn.metrics import accuracy_score, f1_score
 from tqdm import tqdm
 
-import torch
-from transformers import AutoTokenizer
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.inference.predictors import METHODS, get_model
+from src.paths import PLOTS_DIR, PREDICTIONS_DIR, ensure_project_dirs
 
 
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-# ===== 导入模型 =====
-from src.models.bert_model import load_model
-from src.models.lora_model import load_lora_model
-from src.prompt.prompt_classifier import load_llm
-from src.rag.rag_pipeline import (
-    load_data,
-    build_vector_index,
-    rag_classify,
-)
-
-# =============================
-# 1 加载测试数据
-# =============================
-
-print("Loading dataset...")
-
-dataset = load_dataset("ag_news")
-
-test_texts = dataset["test"]["text"][:200]
-test_labels = dataset["test"]["label"][:200]
-
-print("Test samples:", len(test_texts))
+EVAL_SAMPLE_SIZE = 200
 
 
-# =============================
-# 2 通用评测函数
-# =============================
-
-def evaluate_model(name, predict_function):
-
+def evaluate_method(method: str, texts, labels):
+    predictor = get_model(method)
     predictions = []
 
-    for text in tqdm(test_texts, desc=f"Evaluating {name}"):
-
-        pred = predict_function(text)
-
-        predictions.append(pred)
-
-    acc = accuracy_score(test_labels, predictions)
-
-    f1 = f1_score(test_labels, predictions, average="weighted")
-
-    return acc, f1
-
-
-# =============================
-# 3 BERT 预测
-# =============================
-
-print("\nLoading BERT model...")
-
-bert_model = load_model()
-bert_model.eval()
-
-tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-
-
-def bert_predict(text):
-
-    inputs = tokenizer(
-        text,
-        return_tensors="pt",
-        truncation=True,
-        padding=True,
-        max_length=128
-    )
-
-    with torch.no_grad():
-
-        outputs = bert_model(**inputs)
-
-        logits = outputs.logits
-
-        pred = torch.argmax(logits, dim=1).item()
-
-    return pred
-
-
-# =============================
-# 4 LoRA 预测
-# =============================
-
-print("\nLoading LoRA model...")
-
-lora_model = load_lora_model()
-lora_model.eval()
-
-
-def lora_predict(text):
-
-    inputs = tokenizer(
-        text,
-        return_tensors="pt",
-        truncation=True,
-        padding=True,
-        max_length=128
-    )
-
-    with torch.no_grad():
-
-        outputs = lora_model(**inputs)
-
-        logits = outputs.logits
-
-        pred = torch.argmax(logits, dim=1).item()
-
-    return pred
-
-
-# =============================
-# 5 Prompt 预测
-# =============================
-
-print("\nLoading Prompt LLM...")
-
-prompt_llm = load_llm()
-
-
-label_map = {
-    "World": 0,
-    "Sports": 1,
-    "Business": 2,
-    "Sci/Tech": 3
-}
-
-
-def prompt_predict(text):
-
-    prompt = f"""
-Classify the following news into one category:
-
-World
-Sports
-Business
-Sci/Tech
-
-Text:
-{text}
-
-Return ONLY the category name.
-Category:
-"""
-
-    result = prompt_llm(prompt, max_new_tokens=5)
-
-    output = result[0]["generated_text"]
-
-    for key in label_map:
-
-        if key.lower() in output.lower():
-
-            return label_map[key]
-
-    return 0
-
-
-# =============================
-# 6 RAG 预测
-# =============================
-
-print("\nLoading RAG system...")
-
-texts, labels = load_data()
-
-index, embed_model = build_vector_index(texts)
-
-rag_llm = load_llm()
-
-
-def rag_predict(text):
-
-    label, _ = rag_classify(
-        text,
-        texts,
-        labels,
-        index,
-        embed_model,
-        rag_llm
-    )
-
-    return int(label)
-
-
-# =============================
-# 7 运行评测
-# =============================
-
-results = {}
-
-results["BERT"] = evaluate_model("BERT", bert_predict)
-
-results["LoRA"] = evaluate_model("LoRA", lora_predict)
-
-results["Prompt"] = evaluate_model("Prompt", prompt_predict)
-
-results["RAG"] = evaluate_model("RAG", rag_predict)
-
-
-# =============================
-# 8 打印结果
-# =============================
-
-print("\n===== Final Results =====")
-
-print(f"{'Model':<10} {'Accuracy':<10} {'F1':<10}")
-
-print("-" * 30)
-
-for model, (acc, f1) in results.items():
-
-    print(f"{model:<10} {acc:.4f}     {f1:.4f}")
-
+    for text in tqdm(texts, desc=f"Evaluating {method.upper()}"):
+        predictions.append(predictor.predict(text))
+
+    accuracy = accuracy_score(labels, predictions)
+    f1 = f1_score(labels, predictions, average="weighted")
+
+    return {
+        "method": method,
+        "accuracy": accuracy,
+        "f1": f1,
+        "predictions": predictions,
+    }
+
+
+def save_visualizations(results):
+    methods = [item["method"].upper() for item in results]
+    accuracies = [item["accuracy"] for item in results]
+    f1_scores = [item["f1"] for item in results]
+
+    plt.figure(figsize=(8, 5))
+    plt.bar(methods, accuracies, color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
+    plt.ylim(0, 1)
+    plt.title("Accuracy Comparison")
+    plt.ylabel("Accuracy")
+    plt.tight_layout()
+    plt.savefig(PLOTS_DIR / "accuracy_comparison.png")
+    plt.close()
+
+    plt.figure(figsize=(8, 5))
+    plt.bar(methods, f1_scores, color=["#4c78a8", "#f58518", "#54a24b", "#e45756"])
+    plt.ylim(0, 1)
+    plt.title("F1 Comparison")
+    plt.ylabel("Weighted F1")
+    plt.tight_layout()
+    plt.savefig(PLOTS_DIR / "f1_comparison.png")
+    plt.close()
+
+
+def save_metrics(results):
+    summary = [
+        {
+            "method": item["method"],
+            "accuracy": round(item["accuracy"], 4),
+            "f1": round(item["f1"], 4),
+        }
+        for item in results
+    ]
+
+    with open(PREDICTIONS_DIR / "evaluation_summary.json", "w", encoding="utf-8") as file:
+        json.dump(summary, file, ensure_ascii=False, indent=2)
+
+    lines = ["method,accuracy,f1"]
+    for item in summary:
+        lines.append(f"{item['method']},{item['accuracy']},{item['f1']}")
+
+    with open(PREDICTIONS_DIR / "evaluation_summary.csv", "w", encoding="utf-8") as file:
+        file.write("\n".join(lines))
+
+
+def main():
+    ensure_project_dirs()
+
+    print("Loading AG News test split...")
+    dataset = load_dataset("ag_news")
+    test_texts = dataset["test"]["text"][:EVAL_SAMPLE_SIZE]
+    test_labels = dataset["test"]["label"][:EVAL_SAMPLE_SIZE]
+
+    results = []
+    for method in METHODS:
+        print(f"\nLoading {method.upper()}...")
+        result = evaluate_method(method, test_texts, test_labels)
+        results.append(result)
+        print(
+            f"{method.upper()} -> "
+            f"Accuracy: {result['accuracy']:.4f}, "
+            f"Weighted F1: {result['f1']:.4f}"
+        )
+
+    save_visualizations(results)
+    save_metrics(results)
+
+    print(f"\nSaved plots to: {PLOTS_DIR}")
+    print(f"Saved metric summaries to: {PREDICTIONS_DIR}")
+
+
+if __name__ == "__main__":
+    main()

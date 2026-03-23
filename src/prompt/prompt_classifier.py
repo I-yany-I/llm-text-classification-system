@@ -1,16 +1,10 @@
-from transformers import pipeline
 import re
+
+from src.llm.shared_pipeline import load_shared_generation_pipeline
 
 
 def load_llm():
-
-    classifier = pipeline(
-        "text-generation",
-        model="Qwen/Qwen2-1.5B-Instruct",
-        device_map="auto"
-    )
-
-    return classifier
+    return load_shared_generation_pipeline()
 
 
 def classify_news(text, llm):
@@ -32,12 +26,13 @@ Return ONLY the category number.
     result = llm(
         prompt,
         max_new_tokens=5,
-        do_sample=False
+        do_sample=False,
+        return_full_text=False
     )
 
-    output = result[0]["generated_text"]
+    output = result[0]["generated_text"].strip()
 
-    match = re.search(r"[0-3]", output)
+    match = re.search(r"\b[0-3]\b", output)
 
     if match:
         return int(match.group())

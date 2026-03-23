@@ -1,64 +1,107 @@
 import gradio as gr
-from src.rag_pipeline import load_data, build_vector_index, rag_classify, load_llm
 
-print("Loading RAG system...")
-
-# -------------------------
-# 加载数据
-# -------------------------
-texts, labels = load_data()
-
-# -------------------------
-# 构建或加载向量数据库
-# -------------------------
-index, embed_model = build_vector_index(texts)
-
-# -------------------------
-# 加载 LLM
-# -------------------------
-llm = load_llm()
-
-print("System ready!")
-
-# 标签映射
-label_map = {
-    "0": "World",
-    "1": "Sports",
-    "2": "Business",
-    "3": "Sci/Tech"
-}
+from src.inference.predictors import LABEL_MAP, METHODS, get_model, parse_batch_texts
 
 
-# -------------------------
-# 前端分类函数
-# -------------------------
-def classify_news(text):
-    label_id, examples = rag_classify(text, texts, labels, index, embed_model, llm)
-
-    category = label_map.get(label_id, "Unknown")
-
-    similar_text = "\n\n".join(examples)
-
-    return f"{category} (Label {label_id})\n\nSimilar News:\n{similar_text}"
+METHOD_CHOICES = [method.upper() for method in METHODS]
 
 
-# -------------------------
-# Gradio 界面
-# -------------------------
-demo = gr.Interface(
-    fn=classify_news,
-    inputs=gr.Textbox(lines=3, placeholder="Enter news text here..."),
-    outputs="text",
-    title="LLM + RAG News Classifier",
-    description="""
-    News classification using RAG + LLM.
+def format_single_result(result):
+    lines = [
+        f"Method: {result.method.upper()}",
+        f"Predicted Label: {result.label_id}",
+        f"Category: {result.label_name}",
+    ]
 
-    Category Labels:
-    0 = World
-    1 = Sports
-    2 = Business
-    3 = Sci/Tech
-    """
-)
+    if result.examples:
+        lines.append("")
+        lines.append("Retrieved Similar News:")
+        lines.extend(f"- {example}" for example in result.examples)
 
-demo.launch()
+    return "\n".join(lines)
+
+
+def run_single_prediction(method_name: str, text: str):
+    text = text.strip()
+    if not text:
+        return "Please enter one piece of news text."
+
+    predictor = get_model(method_name.lower())
+    result = predictor.predict_with_details(text)
+    return format_single_result(result)
+
+
+def run_batch_prediction(method_name: str, raw_text: str):
+    texts = parse_batch_texts(raw_text)
+    if not texts:
+        return [], "Please enter one text per line for batch prediction."
+
+    predictor = get_model(method_name.lower())
+    predictions = predictor.predict_batch(texts)
+
+    rows = [
+        [text, label_id, LABEL_MAP.get(label_id, "Unknown")]
+        for text, label_id in zip(texts, predictions)
+    ]
+
+    return rows, f"Predicted {len(rows)} texts with {method_name.upper()}."
+
+
+with gr.Blocks(title="News Classification Comparison") as demo:
+    gr.Markdown(
+        """
+        # News Classification Comparison
+        Compare BERT, LoRA, Prompt, and RAG on the same input.
+
+        Labels:
+        - `0` = World
+        - `1` = Sports
+        - `2` = Business
+        - `3` = Sci/Tech
+        """
+    )
+
+    method_selector = gr.Dropdown(
+        choices=METHOD_CHOICES,
+        value="BERT",
+        label="Prediction Method",
+    )
+
+    with gr.Tab("Single Prediction"):
+        single_text = gr.Textbox(
+            lines=6,
+            placeholder="Enter one news text here...",
+            label="News Text",
+        )
+        single_button = gr.Button("Predict")
+        single_output = gr.Textbox(label="Prediction Result", lines=12)
+
+    with gr.Tab("Batch Prediction"):
+        batch_text = gr.Textbox(
+            lines=12,
+            placeholder="Enter one news text per line...",
+            label="Batch Input",
+        )
+        batch_button = gr.Button("Run Batch Prediction")
+        batch_status = gr.Textbox(label="Status", lines=2)
+        batch_output = gr.Dataframe(
+            headers=["text", "label_id", "label_name"],
+            datatype=["str", "number", "str"],
+            label="Batch Prediction Results",
+        )
+
+    single_button.click(
+        fn=run_single_prediction,
+        inputs=[method_selector, single_text],
+        outputs=single_output,
+    )
+
+    batch_button.click(
+        fn=run_batch_prediction,
+        inputs=[method_selector, batch_text],
+        outputs=[batch_output, batch_status],
+    )
+
+
+if __name__ == "__main__":
+    demo.launch()
