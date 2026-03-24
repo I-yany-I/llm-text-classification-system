@@ -8,6 +8,13 @@ import re
 from src.llm.shared_pipeline import load_shared_generation_pipeline
 from src.paths import VECTOR_STORE_DIR, ensure_project_dirs
 
+LABEL_TEXT = {
+    0: "World",
+    1: "Sports",
+    2: "Business",
+    3: "Sci/Tech",
+}
+
 # -------------------------
 # 清理输入文本
 # -------------------------
@@ -22,8 +29,8 @@ def load_data():
 
     dataset = load_dataset("ag_news")
 
-    texts = dataset["train"]["text"][:5000]
-    labels = dataset["train"]["label"][:5000]
+    texts = dataset["train"]["text"]
+    labels = dataset["train"]["label"]
 
     return texts, labels
 
@@ -86,7 +93,7 @@ def build_vector_index(texts):
 # -------------------------
 # 相似文本检索
 # -------------------------
-def retrieve_similar(query, index, embed_model, k=5):
+def retrieve_similar(query, index, embed_model, k=8):
 
     query_embedding = embed_model.encode(
         [query],
@@ -97,7 +104,18 @@ def retrieve_similar(query, index, embed_model, k=5):
 
     distances, indices = index.search(query_embedding, k)
 
-    return indices[0]
+    return indices[0], distances[0]
+
+
+def weighted_vote(indices, scores, labels):
+    vote_scores = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0}
+
+    for idx, score in zip(indices, scores):
+        label = int(labels[idx])
+        vote_scores[label] += max(float(score), 0.0)
+
+    best_label = max(vote_scores, key=vote_scores.get)
+    return best_label, vote_scores
 
 
 # -------------------------
@@ -107,14 +125,16 @@ def rag_classify(query, texts, labels, index, embed_model, llm):
 
     query = clean_query(query)
 
-    similar_indices = retrieve_similar(query, index, embed_model)
+    similar_indices, similar_scores = retrieve_similar(query, index, embed_model)
+    voted_label, vote_scores = weighted_vote(similar_indices, similar_scores, labels)
 
     context = ""
     examples = []
 
-    for i in similar_indices:
+    for i in similar_indices[:5]:
 
-        context += f"Example: {texts[i]} -> {labels[i]}\n"
+        lbl = int(labels[i])
+        context += f"Example: {texts[i]} -> {lbl} ({LABEL_TEXT[lbl]})\n"
 
         examples.append(texts[i])
 
@@ -139,6 +159,7 @@ Rules:
 - Scientific discovery or technology → Sci/Tech
 
 Return ONLY one number: 0, 1, 2, or 3.
+Do not output any explanation.
 
 Answer:
 """
@@ -152,17 +173,21 @@ Answer:
 
     output = result[0]["generated_text"].strip()
 
-    match = re.search(r'\b[0-3]\b', output)
+    match = re.search(r"[0-3]", output)
 
-    if match:
+    llm_label = int(match.group(0)) if match else -1
 
-        label = match.group(0)
-
+    # Hybrid strategy:
+    # 1) retrieval weighted vote gives robust baseline
+    # 2) LLM can override only when retrieval is weak or ties are likely
+    sorted_votes = sorted(vote_scores.values(), reverse=True)
+    margin = sorted_votes[0] - sorted_votes[1]
+    if llm_label in [0, 1, 2, 3] and margin < 0.15:
+        final_label = llm_label
     else:
+        final_label = voted_label
 
-        label = "Unknown"
-
-    return label, examples
+    return str(final_label), examples
 
 
 # -------------------------

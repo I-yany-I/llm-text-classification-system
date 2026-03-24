@@ -1,4 +1,5 @@
 import json
+import argparse
 import sys
 from pathlib import Path
 
@@ -13,9 +14,6 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.inference.predictors import METHODS, get_model
 from src.paths import PLOTS_DIR, PREDICTIONS_DIR, ensure_project_dirs
-
-
-EVAL_SAMPLE_SIZE = 200
 
 
 def evaluate_method(method: str, texts, labels):
@@ -82,12 +80,17 @@ def save_metrics(results):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Evaluate BERT, LoRA, Prompt and RAG on AG News.")
+    parser.add_argument("--sample-size", type=int, default=200)
+    args = parser.parse_args()
+
     ensure_project_dirs()
 
     print("Loading AG News test split...")
     dataset = load_dataset("ag_news")
-    test_texts = dataset["test"]["text"][:EVAL_SAMPLE_SIZE]
-    test_labels = dataset["test"]["label"][:EVAL_SAMPLE_SIZE]
+    sample_size = min(args.sample_size, len(dataset["test"]))
+    test_texts = dataset["test"]["text"][:sample_size]
+    test_labels = dataset["test"]["label"][:sample_size]
 
     results = []
     for method in METHODS:
