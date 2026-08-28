@@ -14,7 +14,7 @@ retrieval:
   embedding_model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
   dense_top_k: 12
   bm25_top_k: 12
-  final_top_k: 5
+  final_top_k: 8
   hybrid_enabled: true
   query_rewrite: true
   rrf_k: 60

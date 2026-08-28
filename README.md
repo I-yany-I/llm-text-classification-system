@@ -128,18 +128,18 @@ python app.py
 python evaluate_campus_kb.py
 ```
 
-从内置评估问题集（126 题）加载问题，输出整体指标与按类别分组的指标。当前冻结数字来自 **126 题全量**（抽取式 + 查询改写 + jieba/BM25 + FAISS + Cross-Encoder，历史评测配置使用 `refusal_ce_threshold=0.75`，在 hash 分桶验证集上选定后再冻结）：
+从内置评估问题集（126 题）加载问题，输出整体指标与按类别分组的指标。最新一次全量实测使用当前配置（抽取式 + 查询改写 + jieba/BM25 + FAISS + RRF + Cross-Encoder，`final_top_k=8`、`refusal_ce_threshold=-0.25`）：
 
-| 指标 | 126 题全量 | 早期 81 题切片（对照） |
+| 指标 | 最新 126 题全量 | 历史 Top-5 对照 |
 |------|------------|------------------------|
-| `citation_hit_rate` | **95.37%** | 85.53% |
-| `citation_recall_at_k` | **89.40%** | 82.14% |
-| `refusal_accuracy` | **100.00%** | 80.00% |
-| `false_refusal_rate` | **4.63%** | 14.47% |
+| `citation_hit_rate` | **100.00%** | 100.00% |
+| `citation_recall_at_k` | **97.35%** | 94.70% |
+| `refusal_accuracy` | **100.00%** | 100.00% |
+| `false_refusal_rate` | **0.00%** | 0.00% |
 
-finance / international 各仅 5 题，细分指标不稳定，对外只报整体。完整预测写在 `artifacts/predictions/campus_kb_eval_126.json`（默认不入库）。阈值搜索脚本：`python tune_refusal_threshold.py`。
+finance / international 各仅 5 题，细分指标不稳定，对外只报整体。完整预测写在 `artifacts/predictions/campus_kb_eval_20260828.json`（默认不入库）。如需比较引用数量，可运行 `python evaluate_campus_kb.py --top-k 5` 或 `--top-k 8`。阈值搜索脚本：`python tune_refusal_threshold.py`。
 
-当前示例配置将 `prompt.refusal_ce_threshold` 设为 `-0.25`，用于降低本地演示中的误拒；因此上表是已保存的历史评测结果，不应直接宣称代表当前阈值。修改阈值或索引后，应重新运行评测再更新对外指标。
+指标来自当前本地模型、当前知识库和当前索引；修改模型、语料、分块参数或拒答阈值后，应重新构建索引并运行评测再更新对外指标。
 
 | 指标 | 含义 |
 |------|------|

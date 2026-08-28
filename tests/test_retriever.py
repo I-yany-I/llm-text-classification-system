@@ -265,6 +265,29 @@ class TestRetrieverSearch:
             assert retriever._get_embedder() is fake_embedder
         model.assert_called_once_with(retriever.embedding_model_name)
 
+    @pytest.mark.parametrize("top_k", [0, -1, 1.5, True])
+    def test_search_rejects_invalid_top_k_before_encoding(self, mock_config, top_k):
+        retriever = CampusKBRetriever(mock_config)
+        retriever.index = MagicMock(ntotal=1)
+        retriever.chunks = [MagicMock()]
+        retriever._encode_query = MagicMock()
+
+        with pytest.raises(ValueError, match="top_k"):
+            retriever.search("测试问题", top_k=top_k)
+
+        retriever._encode_query.assert_not_called()
+
+    def test_search_rejects_empty_faiss_index(self, mock_config):
+        retriever = CampusKBRetriever(mock_config)
+        retriever.index = MagicMock(ntotal=0)
+        retriever.chunks = [MagicMock()]
+        retriever._encode_query = MagicMock()
+
+        with pytest.raises(IndexIncompatibleError, match="empty|rebuild"):
+            retriever.search("测试问题")
+
+        retriever._encode_query.assert_not_called()
+
 
 @pytest.fixture
 def retriever_with_temp_index(tmp_path):

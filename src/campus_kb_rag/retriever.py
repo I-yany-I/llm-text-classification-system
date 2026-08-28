@@ -251,13 +251,21 @@ class CampusKBRetriever:
             )
 
     def search(self, query: str, top_k: int | None = None) -> List[Dict[str, Any]]:
+        self._validate_top_k(top_k)
         if self.index is None or not self.chunks:
             self.load()
+        if self.index is None or int(self.index.ntotal) <= 0:
+            raise IndexIncompatibleError(
+                "Campus KB FAISS index is empty; rebuild the index with --force."
+            )
 
         ret_cfg = self.config["retrieval"]
         dense_k = int(ret_cfg.get("dense_top_k", 12))
         bm25_k = int(ret_cfg.get("bm25_top_k", 12))
-        final_k = int(top_k or ret_cfg.get("final_top_k", 5))
+        final_k = int(
+            top_k if top_k is not None else ret_cfg.get("final_top_k", 5)
+        )
+        self._validate_top_k(final_k)
 
         query_vec = self._encode_query(query)
         dense_ids, dense_scores = self._dense_search(query_vec, dense_k)
@@ -286,6 +294,13 @@ class CampusKBRetriever:
             candidates = self._rerank_cross_encoder(query, candidates, ce_cfg)
         candidates = prefer_topic_docs(query, candidates)
         return candidates[:final_k]
+
+    @staticmethod
+    def _validate_top_k(top_k: int | None) -> None:
+        if top_k is None:
+            return
+        if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k <= 0:
+            raise ValueError("top_k must be a positive integer")
 
     def _encode_query(self, query: str) -> np.ndarray:
         query_vec = self._get_embedder().encode([query], convert_to_numpy=True).astype("float32")

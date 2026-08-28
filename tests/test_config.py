@@ -49,3 +49,8 @@ def test_model_identifier_is_stable_for_hub_id():
     assert cfg.model_identifier("sentence-transformers/demo") == (
         "sentence-transformers/demo"
     )
+
+
+def test_default_final_top_k_is_eight():
+    loaded = cfg.load_config()
+    assert loaded["retrieval"]["final_top_k"] == 8

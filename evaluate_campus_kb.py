@@ -44,6 +44,40 @@ def per_category_summary(results: List[Dict]) -> Dict:
     return {cat: summarize(items) for cat, items in cats.items()}
 
 
+def _positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("top-k must be a positive integer")
+    return parsed
+
+
+def evaluate_cases(
+    rag: CampusKBRAG, questions: List[Dict], top_k: int | None = None
+) -> List[Dict]:
+    results = []
+    for case in questions:
+        response = (
+            rag.ask(case["question"], top_k=top_k)
+            if top_k is not None
+            else rag.ask(case["question"])
+        )
+        results.append(
+            {
+                "id": case.get("id", ""),
+                "category": case.get("category", ""),
+                "question": case["question"],
+                "expected_doc_ids": case["expected_doc_ids"],
+                "should_refuse": case["should_refuse"],
+                "status": response.get("status"),
+                "search_query": response.get("search_query"),
+                "refusal_reason": response.get("refusal_reason"),
+                "answer": response["answer"],
+                "citations": response["citations"],
+            }
+        )
+    return results
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate NJU campus KB RAG.")
     parser.add_argument("--config", default=None, help="主配置文件（可选；省略则用项目默认）")
@@ -57,6 +91,12 @@ def main() -> None:
         default="artifacts/predictions/campus_kb_eval.json",
         help="评测汇总 JSON 的输出位置",
     )
+    parser.add_argument(
+        "--top-k",
+        type=_positive_int,
+        default=None,
+        help="显式指定返回引用数量；省略则使用配置中的 retrieval.final_top_k",
+    )
     args = parser.parse_args()
 
     rag = CampusKBRAG(config_path=args.config)
@@ -65,20 +105,7 @@ def main() -> None:
     questions = load_eval_questions(args.questions)
     print(f"Loaded {len(questions)} evaluation questions.")
 
-    results = []
-    for case in questions:
-        response = rag.ask(case["question"])
-        results.append(
-            {
-                "id": case.get("id", ""),
-                "category": case.get("category", ""),
-                "question": case["question"],
-                "expected_doc_ids": case["expected_doc_ids"],
-                "should_refuse": case["should_refuse"],
-                "answer": response["answer"],
-                "citations": response["citations"],
-            }
-        )
+    results = evaluate_cases(rag, questions, top_k=args.top_k)
 
     overall = summarize(results)
     by_category = per_category_summary(results)
