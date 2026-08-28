@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.campus_kb_rag.retriever import (
     _tokenize,
     _rrf,
+    prefer_topic_docs,
     CampusKBRetriever,
 )
 from src.campus_kb_rag.documents import KBChunk
@@ -62,6 +63,10 @@ class TestTokenize:
         tokens = _tokenize("test123 abc")
         assert "test123" in tokens
         assert "abc" in tokens
+
+    def test_jieba_words_added(self):
+        tokens = _tokenize("统一身份认证")
+        assert "统一身份认证" in tokens or "统一" in tokens
 
 
 # ---------------------------------------------------------------------------
@@ -145,6 +150,7 @@ class TestRetrieverSearch:
             retriever = CampusKBRetriever(mock_config)
 
         # Mock the internal methods
+        retriever._encode_query = MagicMock(return_value=np.zeros((1, 4), dtype="float32"))
         retriever._dense_search = MagicMock(return_value=([0, 1, 2, 3, 4], [0.9, 0.8, 0.7, 0.6, 0.5]))
         retriever._bm25_search = MagicMock(return_value=[2, 0, 4, 1, 3])
         retriever.load = MagicMock()  # prevent actual load
@@ -152,12 +158,14 @@ class TestRetrieverSearch:
         # Need chunks for _result
         retriever.chunks = [
             KBChunk(
+                chunk_id=f"doc-{i}-0",
                 doc_id=f"doc-{i}",
                 title=f"title-{i}",
                 text=f"text content {i}",
                 department="IT",
                 source="test",
                 tags=["test"],
+                updated_at="2026-01-01",
             )
             for i in range(5)
         ]
@@ -175,18 +183,21 @@ class TestRetrieverSearch:
         with patch("src.campus_kb_rag.retriever.SentenceTransformer", autospec=True):
             retriever = CampusKBRetriever(mock_config)
 
+        retriever._encode_query = MagicMock(return_value=np.zeros((1, 4), dtype="float32"))
         retriever._dense_search = MagicMock(return_value=([0, 1, 2, 3, 4], [0.9, 0.8, 0.7, 0.6, 0.5]))
         retriever._bm25_search = MagicMock()
         retriever.load = MagicMock()  # prevent actual load
 
         retriever.chunks = [
             KBChunk(
+                chunk_id=f"doc-{i}-0",
                 doc_id=f"doc-{i}",
                 title=f"title-{i}",
                 text=f"text content {i}",
                 department="IT",
                 source="test",
                 tags=["test"],
+                updated_at="2026-01-01",
             )
             for i in range(5)
         ]
@@ -195,6 +206,62 @@ class TestRetrieverSearch:
 
         retriever.search("测试")
         assert not retriever._bm25_search.called
+
+    def test_cross_encoder_rerank_does_not_overwrite_dense_score(self, mock_config):
+        mock_config["retrieval"]["cross_encoder"] = {
+            "enabled": True,
+            "model_name": "unused",
+            "rerank_pool": 3,
+        }
+        with patch("src.campus_kb_rag.retriever.SentenceTransformer", autospec=True):
+            retriever = CampusKBRetriever(mock_config)
+
+        retriever.load = MagicMock()
+        retriever._encode_query = MagicMock(return_value=np.zeros((1, 4), dtype="float32"))
+        retriever._dense_search = MagicMock(return_value=([0, 1, 2], [0.61, 0.40, 0.22]))
+        retriever._bm25_search = MagicMock(return_value=[1, 0, 2])
+        retriever.chunks = [
+            KBChunk(
+                chunk_id=f"doc-{i}-0",
+                doc_id=f"doc-{i}",
+                title=f"title-{i}",
+                text=f"text content {i}",
+                department="IT",
+                source="test",
+                tags=["test"],
+                updated_at="2026-01-01",
+            )
+            for i in range(3)
+        ]
+        retriever.index = MagicMock()
+        retriever.index.ntotal = 3
+
+        fake_ce = MagicMock()
+        fake_ce.predict.return_value = np.asarray([-2.0, 4.0, 0.5], dtype="float32")
+        with patch("sentence_transformers.CrossEncoder", return_value=fake_ce):
+            results = retriever.search("测试问题")
+
+        assert [item["doc_id"] for item in results] == ["doc-1", "doc-2", "doc-0"]
+        assert results[0]["dense_score"] == pytest.approx(0.40)
+        assert results[0]["score"] == pytest.approx(0.40)
+        assert results[0]["cross_encoder_score"] == pytest.approx(4.0)
+
+    def test_retriever_does_not_load_embedder_on_construction(self, mock_config):
+        with patch("src.campus_kb_rag.retriever.SentenceTransformer") as model:
+            retriever = CampusKBRetriever(mock_config)
+        model.assert_not_called()
+        assert retriever._embedder is None
+
+    def test_embedder_is_created_once_on_first_use(self, mock_config):
+        fake_embedder = MagicMock()
+        with patch(
+            "src.campus_kb_rag.retriever.SentenceTransformer",
+            return_value=fake_embedder,
+        ) as model:
+            retriever = CampusKBRetriever(mock_config)
+            assert retriever._get_embedder() is fake_embedder
+            assert retriever._get_embedder() is fake_embedder
+        model.assert_called_once_with(retriever.embedding_model_name)
 
 
 # ---------------------------------------------------------------------------
@@ -232,3 +299,22 @@ class TestKBChunk:
         chunk = KBChunk(**d)
         assert chunk.doc_id == "nju-it-vpn"
         assert chunk.title == "VPN使用说明"
+
+
+def test_prefer_passport_over_visa():
+    retrieved = [
+        {"doc_id": "nju-intl-visa", "text": "签证"},
+        {"doc_id": "nju-intl-passport", "text": "护照"},
+    ]
+    out = prefer_topic_docs("办护照学校能开什么证明？", retrieved)
+    assert out[0]["doc_id"] == "nju-intl-passport"
+    assert out[0]["topic_preferred"] is True
+
+
+def test_prefer_major_transfer():
+    retrieved = [
+        {"doc_id": "nju-ac-degree", "text": "学位"},
+        {"doc_id": "nju-ac-major-transfer", "text": "转专业"},
+    ]
+    out = prefer_topic_docs("想转专业到另一个院系", retrieved)
+    assert out[0]["doc_id"] == "nju-ac-major-transfer"
