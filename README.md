@@ -19,17 +19,16 @@
 
 - **内容来源**：知识库内容基于南京大学各主管部门（信息化建设管理服务中心、教务处、学生服务中心等）的公开信息整理而成，非官方数据库导出。文本经过结构化改写和元数据标注，以适配 RAG 系统的检索和引用需求。
 - **准确性**：内容力求反映公开信息，但可能已过时或不完整。正式部署时应以各主管部门最新官方通知为准，本系统仅作为技术演示。
-- **评测集**：自建 **126 题**评测集（含 20 道多跳推理题和 20 道拒答题），覆盖 it / academic / student / finance / international / refusal 六大类别，每道题标注了期望引用的文档 ID。
+- **评测集**：自建 **126 题**评测集（106 道可答题、20 道拒答题；其中 28 道标注了至少两个期望文档，用于多文档引用），覆盖 it / academic / student / finance / international / refusal 六大类别。
+- **编排说明**：本项目是 **Python 流水线 RAG**（BM25 + FAISS 稠密召回 + RRF + Cross-Encoder + 引用/拒答），**不是** LangGraph Agent。不把「状态图编排」写成已实现能力。
 
 ## 系统架构
 
 ```
 用户问题
   │
-  ├─ 查询改写 Prompt（可选：让口语问题更适合检索）
-  │
   ▼
-BM25 关键词召回 + Sentence-Transformer 稠密召回
+BM25 关键词召回 + Sentence-Transformer 稠密召回（FAISS）
   │
   ▼
 RRF 融合候选
@@ -41,7 +40,7 @@ BERT Cross-Encoder 重排（可消融对比）
 Top-N 引用片段
   │
   ▼
-Qwen2 文本生成 / LoRA 适配模型（可选）
+抽取式回答 / 可选 Qwen2、LoRA
   │
   ▼
 带引用的中文回答 + 拒答判断
@@ -116,7 +115,7 @@ python app.py
 python evaluate_campus_kb.py
 ```
 
-从内置评估问题集（126 题）加载问题，输出整体指标与按类别（it / academic / student / finance / international / refusal）分组的指标：
+从内置评估问题集（126 题）加载问题，输出整体指标与按类别分组的指标。对外引用的 85.5% / 82.1% / 80.0% 来自早期 **81 题切片**，126 题全量需重新跑评测后才能替换。
 
 | 指标 | 含义 |
 |------|------|
