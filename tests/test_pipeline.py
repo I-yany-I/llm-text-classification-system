@@ -37,6 +37,7 @@ class TestRefusalLogic:
             },
             "prompt": {
                 "refusal_threshold": 0.18,
+                "refusal_ce_threshold": 0.0,
                 "refusal_doc_ids": ["nju-support-unknown"],
             },
             "generation": {"backend": "extractive"},
@@ -50,50 +51,174 @@ class TestRefusalLogic:
                 return rag
 
     def test_empty_retrieved_returns_empty(self, rag_with_config):
-        result = rag_with_config._filter_low_confidence([])
-        assert result == []
+        evidence, reason = rag_with_config._filter_low_confidence([])
+        assert evidence == []
+        assert reason == "low_confidence"
 
     def test_refusal_doc_id_triggers_rejection(self, rag_with_config):
         retrieved = [{"doc_id": "nju-support-unknown", "score": 0.85, "text": "..."}]
-        result = rag_with_config._filter_low_confidence(retrieved)
-        assert result == []
+        evidence, reason = rag_with_config._filter_low_confidence(retrieved)
+        assert evidence == []
+        assert reason == "sentinel_document"
 
     def test_score_below_threshold_rejected(self, rag_with_config):
         retrieved = [{"doc_id": "nju-it-vpn", "score": 0.10, "text": "..."}]
-        result = rag_with_config._filter_low_confidence(retrieved)
-        assert result == []
+        evidence, reason = rag_with_config._filter_low_confidence(retrieved)
+        assert evidence == []
+        assert reason == "low_confidence"
 
     def test_score_above_threshold_accepted(self, rag_with_config):
         retrieved = [{"doc_id": "nju-it-vpn", "score": 0.50, "text": "..."}]
-        result = rag_with_config._filter_low_confidence(retrieved)
-        assert len(result) == 1
-        assert result[0]["doc_id"] == "nju-it-vpn"
+        evidence, reason = rag_with_config._filter_low_confidence(retrieved)
+        assert len(evidence) == 1
+        assert evidence[0]["doc_id"] == "nju-it-vpn"
+        assert reason is None
 
     def test_threshold_exactly_at_boundary(self, rag_with_config):
         # score == threshold (0.18): code uses '<' not '<=', so equal is accepted
         retrieved = [{"doc_id": "nju-it-vpn", "score": 0.18, "text": "..."}]
-        result = rag_with_config._filter_low_confidence(retrieved)
-        assert len(result) == 1  # 0.18 < 0.18 is False → accepted
+        evidence, reason = rag_with_config._filter_low_confidence(retrieved)
+        assert len(evidence) == 1  # 0.18 < 0.18 is False -> accepted
+        assert reason is None
 
     def test_refusal_doc_id_checked_before_score(self, rag_with_config):
         """Even with high score, refusal doc_id should trigger rejection."""
         retrieved = [{"doc_id": "nju-support-unknown", "score": 0.99, "text": "..."}]
-        result = rag_with_config._filter_low_confidence(retrieved)
-        assert result == []
+        evidence, reason = rag_with_config._filter_low_confidence(retrieved)
+        assert evidence == []
+        assert reason == "sentinel_document"
 
     def test_different_refusal_doc_ids(self, rag_with_config):
         rag_with_config.config["prompt"]["refusal_doc_ids"] = ["custom-refusal", "fallback-doc"]
         retrieved = [{"doc_id": "custom-refusal", "score": 0.90, "text": "..."}]
-        result = rag_with_config._filter_low_confidence(retrieved)
-        assert result == []
+        evidence, reason = rag_with_config._filter_low_confidence(retrieved)
+        assert evidence == []
+        assert reason == "sentinel_document"
+
+    def test_dense_score_used_when_cross_encoder_off(self, rag_with_config):
+        retrieved = [
+            {
+                "doc_id": "nju-it-vpn",
+                "score": -4.2,
+                "dense_score": 0.51,
+                "cross_encoder_score": -4.2,
+                "text": "...",
+            }
+        ]
+        evidence, reason = rag_with_config._filter_low_confidence(retrieved)
+        assert len(evidence) == 1
+        assert reason is None
+
+    def test_cross_encoder_negative_logit_refused(self, rag_with_config):
+        rag_with_config.config["retrieval"]["cross_encoder"]["enabled"] = True
+        retrieved = [
+            {
+                "doc_id": "nju-it-vpn",
+                "dense_score": 0.51,
+                "cross_encoder_score": -1.2,
+                "score": 0.51,
+                "text": "...",
+            }
+        ]
+        evidence, reason = rag_with_config._filter_low_confidence(retrieved)
+        assert evidence == []
+        assert reason == "low_confidence"
+
+    def test_topic_preferred_negative_ce_accepted_with_dense(self, rag_with_config):
+        rag_with_config.config["retrieval"]["cross_encoder"]["enabled"] = True
+        retrieved = [
+            {
+                "doc_id": "nju-intl-passport",
+                "dense_score": 0.78,
+                "cross_encoder_score": -0.41,
+                "score": 0.78,
+                "topic_preferred": True,
+                "text": "...",
+            }
+        ]
+        evidence, reason = rag_with_config._filter_low_confidence(retrieved)
+        assert len(evidence) == 1
+        assert reason is None
+
+    def test_out_of_scope_skips_retrieval(self, rag_with_config):
+        rag_with_config.retriever = MagicMock()
+        rag_with_config.generator = MagicMock()
+        rag_with_config.generator.generate.return_value = "no evidence"
+        result = rag_with_config.ask("学校附近哪里有打印店？价格怎么样？")
+        rag_with_config.retriever.search.assert_not_called()
+        assert result["status"] == "refused"
+        assert result["refusal_reason"] == "out_of_scope"
+        assert result["search_query"] is None
+        assert result["citations"] == []
+        assert result["retrieved"] == []
+
+    def test_cross_encoder_positive_logit_accepted(self, rag_with_config):
+        rag_with_config.config["retrieval"]["cross_encoder"]["enabled"] = True
+        retrieved = [
+            {
+                "doc_id": "nju-it-vpn",
+                "dense_score": 0.51,
+                "cross_encoder_score": 1.2,
+                "score": 0.51,
+                "text": "...",
+            }
+        ]
+        evidence, reason = rag_with_config._filter_low_confidence(retrieved)
+        assert len(evidence) == 1
+        assert reason is None
 
     def test_no_prompt_config_defaults(self, rag_with_config):
         """Without prompt config keys, should still work with defaults."""
         rag_with_config.config.pop("prompt")
         retrieved = [{"doc_id": "some-doc", "score": 0.50, "text": "..."}]
-        result = rag_with_config._filter_low_confidence(retrieved)
+        evidence, reason = rag_with_config._filter_low_confidence(retrieved)
         # Default threshold is 0.18, score 0.50 > 0.18 → accepted
-        assert len(result) == 1
+        assert len(evidence) == 1
+        assert reason is None
+
+    def test_empty_query_returns_input_required(self, rag_with_config):
+        rag_with_config.retriever = MagicMock()
+        rag_with_config.generator = MagicMock()
+        result = rag_with_config.ask("  \n")
+        assert result["status"] == "input_required"
+        assert result["query"] == ""
+        assert result["search_query"] is None
+        assert result["refusal_reason"] is None
+        rag_with_config.retriever.search.assert_not_called()
+
+    @pytest.mark.parametrize("top_k", [0, -1, 1.5, True])
+    def test_invalid_top_k_fails_before_retrieval(self, rag_with_config, top_k):
+        rag_with_config.retriever = MagicMock()
+        rag_with_config.generator = MagicMock()
+        with pytest.raises(ValueError, match="top_k"):
+            rag_with_config.ask("校园卡怎么办", top_k=top_k)
+        rag_with_config.retriever.search.assert_not_called()
+
+    def test_answered_result_contains_rewritten_query_and_scores(self, rag_with_config):
+        rag_with_config.retriever = MagicMock()
+        rag_with_config.generator = MagicMock()
+        rag_with_config.generator.generate.return_value = "请先挂失，再补办。"
+        rag_with_config.retriever.search.return_value = [
+            {
+                "doc_id": "nju-it-card",
+                "title": "校园卡补办",
+                "department": "信息化中心",
+                "source": "https://example.com",
+                "updated_at": "2026-08-01",
+                "text": "先挂失，再携带证件补办。",
+                "score": 0.8,
+                "dense_score": 0.8,
+                "rrf_score": 0.03,
+                "cross_encoder_score": 1.2,
+            }
+        ]
+        result = rag_with_config.ask("校卡怎么补办")
+        assert result["status"] == "answered"
+        assert result["search_query"]
+        assert result["refusal_reason"] is None
+        assert result["citations"][0]["dense_score"] == pytest.approx(0.8)
+        assert result["citations"][0]["rrf_score"] == pytest.approx(0.03)
+        assert result["citations"][0]["cross_encoder_score"] == pytest.approx(1.2)
 
 
 # ---------------------------------------------------------------------------
