@@ -7,6 +7,7 @@ index:
   dir: vector_store/campus_kb
   faiss_path: vector_store/campus_kb/faiss.index
   metadata_path: vector_store/campus_kb/chunks.json
+  manifest_path: vector_store/campus_kb/manifest.json
   rebuild: false
 
 retrieval:
@@ -15,6 +16,7 @@ retrieval:
   bm25_top_k: 12
   final_top_k: 5
   hybrid_enabled: true
+  query_rewrite: true
   rrf_k: 60
   cross_encoder:
     enabled: true
@@ -32,7 +34,8 @@ generation:
 prompt:
   institution: 南京大学
   persona: 南京大学校园办事指南助手
-  refusal_threshold: 0.18
+  refusal_threshold: 0.18          # dense cosine; used when Cross-Encoder is off
+  refusal_ce_threshold: -0.25      # CE logit; out-of-scope phrases hold refuse cases that sat above this bar
   refusal_doc_ids:
     - nju-support-unknown
   require_citations: true

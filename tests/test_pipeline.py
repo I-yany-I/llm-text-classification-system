@@ -41,7 +41,6 @@ class TestRefusalLogic:
                 "refusal_doc_ids": ["nju-support-unknown"],
             },
             "generation": {"backend": "extractive"},
-            "index": {"dir": "vector_store/", "faiss_path": "faiss.index", "metadata_path": "chunks.json"},
         }
         # Avoid loading models by patching the retriever init
         with patch("src.campus_kb_rag.pipeline.CampusKBRetriever", autospec=True):

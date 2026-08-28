@@ -13,14 +13,14 @@
 
 系统只基于知识库片段作答，回答中返回引用来源；当知识库没有依据时明确拒答，避免把通用大模型的记忆当成学校政策。
 
-> 内置 JSONL 知识库收录信息化服务、教务服务、学生服务、财务、出国（境）等多类办事指南，共 **75 条**文档，覆盖 VPN、统一身份认证、选课、考试、成绩、毕业论文、学位、邮箱、正版软件、校园网络、信息安全、在读证明、成绩单等高频场景。
+> 内置 JSONL 知识库收录信息化服务、教务服务、学生服务、财务、出国（境）等多类办事指南，共 **77 条**文档，覆盖 VPN、统一身份认证、选课、考试、成绩、毕业论文、学位、邮箱、正版软件、校园网络、信息安全、在读证明、成绩单等高频场景。
 
 ### 数据说明
 
-- **内容来源**：知识库内容基于南京大学各主管部门（信息化建设管理服务中心、教务处、学生服务中心等）的公开信息整理而成，非官方数据库导出。文本经过结构化改写和元数据标注，以适配 RAG 系统的检索和引用需求。
-- **准确性**：内容力求反映公开信息，但可能已过时或不完整。正式部署时应以各主管部门最新官方通知为准，本系统仅作为技术演示。
-- **评测集**：自建 **126 题**评测集（106 道可答题、20 道拒答题；其中 28 道标注了至少两个期望文档，用于多文档引用），覆盖 it / academic / student / finance / international / refusal 六大类别。
-- **编排说明**：本项目是 **Python 流水线 RAG**（BM25 + FAISS 稠密召回 + RRF + Cross-Encoder + 引用/拒答），**不是** LangGraph Agent。不把「状态图编排」写成已实现能力。
+- **内容来源**：条目先按主管部门公开信息结构化整理，再把能抓到正文的官网页写回对应文档。已经核对过正文的页面包括本科生院 [2026 年春季开学教务事项](https://jw.nju.edu.cn/83/24/c26263a820004/page.htm)、[出国成绩/学历证明](https://jw.nju.edu.cn/a9/32/c24739a370994/page.htm)、[学生证补办](https://jw.nju.edu.cn/24751/list.htm)、[教服平台](https://jw.nju.edu.cn/24777/list.htm)，以及信息化中心 [自助打印](https://itsc.nju.edu.cn/21426/list.htm)、[校外 VPN](https://itsc.nju.edu.cn/21601/list.htm)、[统一身份认证](https://itsc.nju.edu.cn/tysfrz/list.htm)、[正版软件](https://itsc.nju.edu.cn/zbrj/mainm.htm)、[校园卡补卡](https://itsc.nju.edu.cn/21446/list.htm)。选课平台、ehall 等登录后系统没有抓。部分栏目页只有导航壳，正文仍用结构化摘要并保留官方入口。
+- **准确性**：内容力求反映公开信息，但可能已过时或不完整。正式办事请以主管部门最新通知为准，本系统仅作为技术演示。
+- **评测集**：自建 **126 题**评测集（108 道可答题、18 道拒答题；其中 28 道标注了至少两个期望文档），覆盖 it / academic / student / finance / international / refusal。
+- **编排说明**：本项目是 **Python 流水线 RAG**（查询改写 + jieba/BM25 + FAISS + RRF + Cross-Encoder + 引用/拒答），**不是** LangGraph Agent。
 
 ## 系统架构
 
@@ -28,7 +28,10 @@
 用户问题
   │
   ▼
-BM25 关键词召回 + Sentence-Transformer 稠密召回（FAISS）
+确定性查询改写（校园同义词，不是 LLM）
+  │
+  ▼
+BM25（jieba + 单字/bigram）+ Sentence-Transformer / FAISS
   │
   ▼
 RRF 融合候选
@@ -37,7 +40,7 @@ RRF 融合候选
 BERT Cross-Encoder 重排（可消融对比）
   │
   ▼
-Top-N 引用片段
+验证集搜索得到的 CE 拒答阈值
   │
   ▼
 抽取式回答 / 可选 Qwen2、LoRA
@@ -52,7 +55,7 @@ Top-N 引用片段
 |------|------|------|
 | 知识库 | JSONL 文档 + 段落分块 | 含 `source`、`source_type`、`updated_at`、`collected_at` 等元数据 |
 | 稠密检索 | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` + FAISS | 适合中文问句与办事片段的语义召回 |
-| 稀疏检索 | BM25（rank-bm25）+ RRF 融合 | 保留「VPN」「统一身份认证」「成绩单」等关键词优势 |
+| 稀疏检索 | BM25（jieba + 中文单字/bigram）+ RRF | 词边界与关键词（VPN、成绩单）一起保留 |
 | BERT 重排 | `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` | 对 `(问题, 片段)` 精排，提高引用命中率 |
 | Prompt | 有据作答、引用格式、拒答策略 | 约束模型只依据检索证据回答 |
 | LoRA | PEFT adapter 可选加载 | 用少量问答对适配校园办事口吻与输出格式 |
@@ -69,13 +72,21 @@ pip install -r requirements.txt
 
 建议使用 Python 3.10+。CPU 可运行检索和抽取式回答；开启 Qwen2 生成时建议使用 CUDA。
 
+导入应用或构造 RAG 对象不会加载模型权重；只有构建索引或第一次执行稠密检索时才会加载 embedding，启用 Cross-Encoder 后第一次重排时才加载重排模型。默认抽取式回答也不会加载 Qwen2。国内网络下 Hugging Face 可能卡住，可先把权重下到项目内 `models/`（已 gitignore）：
+
+```bash
+python download_models.py
+```
+
+脚本默认走 ModelScope HTTP，失败再回退 Hugging Face；之后流水线会优先用本地快照，不必改配置里的模型 ID。
+
 ### 2. 构建校园知识库索引
 
 ```bash
 python build_campus_kb_index.py
 ```
 
-默认读取配置中的知识库数据，将 FAISS 索引与元数据写入本地索引目录（首次运行自动生成）。强制重建索引：
+默认读取配置中的知识库数据，将 FAISS 索引、chunk 元数据和 `manifest.json` 写入本地索引目录。manifest 会记录语料 SHA-256、embedding 模型、分块参数、向量维度和数量；语料、模型或分块配置变化后，查询不会静默复用旧索引，需显式强制重建：
 
 ```bash
 python build_campus_kb_index.py --force
@@ -109,13 +120,26 @@ python app.py
 - `统一身份认证密码忘记了怎么办？`
 - `成绩单和在读证明应该找哪个部门？`
 
+`CampusKBRAG.ask()` 返回结构化结果：`status` 为 `answered`、`refused` 或 `input_required`；当拒答时，`refusal_reason` 会标记为 `out_of_scope`、`low_confidence` 或 `sentinel_document`。`search_query` 保存实际用于检索的标准化/改写问题，便于排查召回效果。
+
 ### 4. 运行评估
 
 ```bash
 python evaluate_campus_kb.py
 ```
 
-从内置评估问题集（126 题）加载问题，输出整体指标与按类别分组的指标。对外引用的 85.5% / 82.1% / 80.0% 来自早期 **81 题切片**，126 题全量需重新跑评测后才能替换。
+从内置评估问题集（126 题）加载问题，输出整体指标与按类别分组的指标。当前冻结数字来自 **126 题全量**（抽取式 + 查询改写 + jieba/BM25 + FAISS + Cross-Encoder，历史评测配置使用 `refusal_ce_threshold=0.75`，在 hash 分桶验证集上选定后再冻结）：
+
+| 指标 | 126 题全量 | 早期 81 题切片（对照） |
+|------|------------|------------------------|
+| `citation_hit_rate` | **95.37%** | 85.53% |
+| `citation_recall_at_k` | **89.40%** | 82.14% |
+| `refusal_accuracy` | **100.00%** | 80.00% |
+| `false_refusal_rate` | **4.63%** | 14.47% |
+
+finance / international 各仅 5 题，细分指标不稳定，对外只报整体。完整预测写在 `artifacts/predictions/campus_kb_eval_126.json`（默认不入库）。阈值搜索脚本：`python tune_refusal_threshold.py`。
+
+当前示例配置将 `prompt.refusal_ce_threshold` 设为 `-0.25`，用于降低本地演示中的误拒；因此上表是已保存的历史评测结果，不应直接宣称代表当前阈值。修改阈值或索引后，应重新运行评测再更新对外指标。
 
 | 指标 | 含义 |
 |------|------|
@@ -131,15 +155,18 @@ python evaluate_campus_kb.py
 | 配置项 | 说明 |
 |--------|------|
 | `knowledge_base.path` | 知识库数据文件位置 |
+| `index.manifest_path` | 索引契约文件；记录模型、语料和向量元数据，加载前会校验 |
 | `retrieval.hybrid_enabled` | 是否启用 BM25 + 稠密召回融合 |
 | `retrieval.cross_encoder.enabled` | 是否启用 BERT Cross-Encoder 重排 |
 | `generation.backend` | `extractive`（默认）或 `llm` |
 | `generation.lora_adapter_path` | LoRA adapter；为空则使用基座模型 |
-| `prompt.refusal_threshold` | 低相似度时触发拒答 |
+| `prompt.refusal_threshold` | 关闭 Cross-Encoder 时，Top1 稠密余弦低于该值则拒答 |
+| `retrieval.query_rewrite` | 检索前做校园同义词扩展（默认开启） |
+| `prompt.refusal_ce_threshold` | 开启 Cross-Encoder 时，Top1 logit 低于该值则拒答（当前配置为 -0.25） |
 
 ## 目录结构（概要）
 
-- **入口脚本：** Gradio 演示、索引构建、离线评估。
+- **入口脚本：** Gradio 演示、索引构建、模型下载、离线评估。
 - **配置：** 根目录 YAML，集中管理知识库与管线参数。
 - **数据：** JSONL 知识库与评估问题集（条数见上文）。
 - **源码：** `campus_kb_rag` 包（配置加载、分块、检索、生成、端到端流水线）。
@@ -150,7 +177,7 @@ python evaluate_campus_kb.py
 
 - **CPU**：可运行索引构建、检索、抽取式回答与评估。
 - **GPU**：推荐用于 Qwen2 生成、Cross-Encoder 大批量重排或 LoRA adapter 推理。
-- **磁盘**：预留 Hugging Face 模型缓存与本地向量索引占用空间。
+- **磁盘**：预留 `models/` 本地快照（或 Hugging Face 缓存）与向量索引占用空间。
 
 ---
 

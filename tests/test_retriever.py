@@ -6,9 +6,8 @@ Run from project root:
 
 import json
 import sys
-import math
 from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest

@@ -2,6 +2,7 @@
 results/
 artifacts/
 vector_store/
+models/
 data/campus_kb/*.local.jsonl
 data/campus_kb/private_*.jsonl
 __pycache__/
