@@ -8,6 +8,7 @@ data/campus_kb/private_*.jsonl
 __pycache__/
 *.py[codz]
 *$py.class
+.pytest-tmp-*/
 
 # Cursor IDE (local workspace metadata)
 .cursor/
