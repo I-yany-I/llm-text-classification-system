@@ -25,11 +25,21 @@ def answer(question: str, top_k: int):
     ]
     retrieved_text = "\n\n".join(
         [
-            f"[{i}] {item['title']} | score={float(item.get('score', 0.0)):.4f}\n"
-            f"{item['text']}"
+            f"[{i}] {item['title']} | dense={float(item.get('dense_score', item.get('score', 0.0))):.4f}"
+            + (
+                f" | ce={float(item['cross_encoder_score']):.4f}"
+                if item.get("cross_encoder_score") is not None
+                else ""
+            )
+            + f"\n{item['text']}"
             for i, item in enumerate(result.get("retrieved", []), start=1)
         ]
     )
+    diagnostic = (
+        f"status={result.get('status', 'unknown')} | "
+        f"refusal_reason={result.get('refusal_reason') or 'none'}"
+    )
+    retrieved_text = f"{diagnostic}\n\n{retrieved_text}" if retrieved_text else diagnostic
     return result["answer"], citation_rows, retrieved_text
 
 
