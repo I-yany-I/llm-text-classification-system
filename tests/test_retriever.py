@@ -4,6 +4,7 @@ Run from project root:
     python -m pytest tests/test_retriever.py -v
 """
 
+import json
 import sys
 import math
 from pathlib import Path
@@ -19,8 +20,10 @@ from src.campus_kb_rag.retriever import (
     _rrf,
     prefer_topic_docs,
     CampusKBRetriever,
+    IndexIncompatibleError,
 )
 from src.campus_kb_rag.documents import KBChunk
+from src.campus_kb_rag.config import file_sha256, model_identifier
 
 
 # ---------------------------------------------------------------------------
@@ -262,6 +265,190 @@ class TestRetrieverSearch:
             assert retriever._get_embedder() is fake_embedder
             assert retriever._get_embedder() is fake_embedder
         model.assert_called_once_with(retriever.embedding_model_name)
+
+
+@pytest.fixture
+def retriever_with_temp_index(tmp_path):
+    kb_path = tmp_path / "kb.jsonl"
+    kb_path.write_text("source", encoding="utf-8")
+    index_dir = tmp_path / "index"
+    index_dir.mkdir()
+    faiss_path = index_dir / "faiss.index"
+    metadata_path = index_dir / "chunks.json"
+    faiss_path.write_bytes(b"fake faiss")
+
+    config = {
+        "knowledge_base": {
+            "_resolved_path": str(kb_path),
+            "chunk_size": 420,
+            "chunk_overlap": 80,
+        },
+        "index": {
+            "_resolved_dir": str(index_dir),
+            "_resolved_faiss_path": str(faiss_path),
+            "_resolved_metadata_path": str(metadata_path),
+        },
+        "retrieval": {
+            "embedding_model": "test-model",
+            "hybrid_enabled": True,
+            "dense_top_k": 12,
+            "bm25_top_k": 12,
+            "final_top_k": 5,
+            "rrf_k": 60,
+            "cross_encoder": {"enabled": False},
+        },
+    }
+    retriever = CampusKBRetriever(config)
+    retriever.chunks = [
+        KBChunk(
+            chunk_id=f"doc-{i}-0",
+            doc_id=f"doc-{i}",
+            title=f"title-{i}",
+            text=f"text content {i}",
+            department="IT",
+            source="test",
+            tags=["test"],
+            updated_at="2026-01-01",
+        )
+        for i in range(3)
+    ]
+    metadata_path.write_text(
+        json.dumps([chunk.to_dict() for chunk in retriever.chunks]),
+        encoding="utf-8",
+    )
+    fake_index = MagicMock()
+    fake_index.ntotal = 3
+    fake_index.d = 4
+    fake_faiss = MagicMock()
+    fake_faiss.read_index.return_value = fake_index
+    retriever._test_faiss = fake_faiss
+    manifest = {
+        "schema_version": 1,
+        "embedding_model": model_identifier(retriever.embedding_model_name),
+        "source_sha256": file_sha256(kb_path),
+        "chunk_size": 420,
+        "chunk_overlap": 80,
+        "chunk_count": 3,
+        "vector_count": 3,
+        "vector_dim": 4,
+    }
+    (index_dir / "manifest.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+    return retriever
+
+
+def test_load_accepts_valid_manifest(retriever_with_temp_index):
+    with patch(
+        "src.campus_kb_rag.retriever._get_faiss",
+        return_value=retriever_with_temp_index._test_faiss,
+    ):
+        retriever_with_temp_index.load()
+    assert len(retriever_with_temp_index.chunks) == 3
+
+
+def test_load_rejects_changed_source(retriever_with_temp_index):
+    retriever_with_temp_index.kb_path.write_text("changed", encoding="utf-8")
+    with patch(
+        "src.campus_kb_rag.retriever._get_faiss",
+        return_value=retriever_with_temp_index._test_faiss,
+    ):
+        with pytest.raises(IndexIncompatibleError, match="rebuild"):
+            retriever_with_temp_index.load()
+
+
+def test_load_rejects_metadata_count_mismatch(retriever_with_temp_index):
+    retriever_with_temp_index.metadata_path.write_text("[]", encoding="utf-8")
+    with patch(
+        "src.campus_kb_rag.retriever._get_faiss",
+        return_value=retriever_with_temp_index._test_faiss,
+    ):
+        with pytest.raises(IndexIncompatibleError, match="count|rebuild"):
+            retriever_with_temp_index.load()
+
+
+def test_load_does_not_rebuild_when_manifest_is_missing(retriever_with_temp_index):
+    retriever_with_temp_index.manifest_path.unlink()
+    retriever_with_temp_index.build = MagicMock()
+    with pytest.raises(IndexIncompatibleError, match="manifest"):
+        retriever_with_temp_index.load()
+    retriever_with_temp_index.build.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("field", "invalid_value"),
+    [
+        ("embedding_model", "different-model"),
+        ("chunk_size", 999),
+        ("vector_dim", 999),
+    ],
+)
+def test_load_rejects_manifest_contract_mismatch(
+    retriever_with_temp_index, field, invalid_value
+):
+    manifest = json.loads(
+        retriever_with_temp_index.manifest_path.read_text(encoding="utf-8")
+    )
+    manifest[field] = invalid_value
+    retriever_with_temp_index.manifest_path.write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+    with patch(
+        "src.campus_kb_rag.retriever._get_faiss",
+        return_value=retriever_with_temp_index._test_faiss,
+    ):
+        with pytest.raises(IndexIncompatibleError, match=field):
+            retriever_with_temp_index.load()
+
+
+def test_build_writes_manifest_without_loading_real_model(tmp_path):
+    kb_path = tmp_path / "kb.jsonl"
+    kb_path.write_text(
+        json.dumps(
+            {
+                "id": "doc-1",
+                "title": "校园卡补办",
+                "department": "信息化中心",
+                "source": "https://example.com",
+                "updated_at": "2026-08-01",
+                "tags": ["校园卡"],
+                "text": "校园卡遗失后请先挂失，再携带证件前往服务大厅补办。",
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    index_dir = tmp_path / "index"
+    config = {
+        "knowledge_base": {
+            "_resolved_path": str(kb_path),
+            "chunk_size": 420,
+            "chunk_overlap": 80,
+        },
+        "index": {
+            "_resolved_dir": str(index_dir),
+            "_resolved_faiss_path": str(index_dir / "faiss.index"),
+            "_resolved_metadata_path": str(index_dir / "chunks.json"),
+        },
+        "retrieval": {
+            "embedding_model": "test-model",
+            "cross_encoder": {"enabled": False},
+        },
+    }
+    fake_embedder = MagicMock()
+    fake_embedder.encode.return_value = np.ones((1, 4), dtype="float32")
+    with patch(
+        "src.campus_kb_rag.retriever.SentenceTransformer",
+        return_value=fake_embedder,
+    ):
+        retriever = CampusKBRetriever(config)
+        retriever.build(force=True)
+
+    manifest = json.loads(retriever.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["chunk_count"] == 1
+    assert manifest["vector_count"] == 1
+    assert manifest["vector_dim"] == 4
 
 
 # ---------------------------------------------------------------------------

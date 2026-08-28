@@ -10,13 +10,21 @@ from typing import Any, Dict, List
 import numpy as np
 from rank_bm25 import BM25Okapi
 
-from src.campus_kb_rag.config import resolve_model_source
+from src.campus_kb_rag.config import file_sha256, model_identifier, resolve_model_source
 from src.campus_kb_rag.documents import KBChunk, chunk_documents, load_documents
 
 
 # Optional retrieval backends are loaded only when an index is built or queried.
 faiss = None
 SentenceTransformer = None
+
+
+class IndexIncompatibleError(ValueError):
+    """Raised when cached index artifacts do not match the current contract."""
+
+
+class IndexLoadError(RuntimeError):
+    """Raised when cached index artifacts cannot be read."""
 
 
 def _get_faiss():
@@ -94,6 +102,9 @@ class CampusKBRetriever:
         self.index_dir = Path(idx_cfg["_resolved_dir"])
         self.faiss_path = Path(idx_cfg["_resolved_faiss_path"])
         self.metadata_path = Path(idx_cfg["_resolved_metadata_path"])
+        self.manifest_path = Path(
+            idx_cfg.get("_resolved_manifest_path", self.index_dir / "manifest.json")
+        )
         self.embedding_model_name = resolve_model_source(ret_cfg["embedding_model"])
         self._embedder = None
         self.chunks: List[KBChunk] = []
@@ -111,9 +122,14 @@ class CampusKBRetriever:
         return self._embedder
 
     def build(self, force: bool = False) -> None:
-        if not force and self.faiss_path.exists() and self.metadata_path.exists():
-            self.load()
-            return
+        artifacts = (self.faiss_path, self.metadata_path, self.manifest_path)
+        if not force and any(path.exists() for path in artifacts):
+            if all(path.exists() for path in artifacts):
+                self.load()
+                return
+            raise IndexIncompatibleError(
+                "Campus KB index artifacts are incomplete; rebuild the index with --force."
+            )
 
         docs = load_documents(self.kb_path)
         kb_cfg = self.config["knowledge_base"]
@@ -141,16 +157,98 @@ class CampusKBRetriever:
         faiss_module.write_index(self.index, str(self.faiss_path))
         with self.metadata_path.open("w", encoding="utf-8") as f:
             json.dump([c.to_dict() for c in self.chunks], f, ensure_ascii=False, indent=2)
+        with self.manifest_path.open("w", encoding="utf-8") as f:
+            json.dump(
+                self._manifest_payload(
+                    vector_dim=int(embeddings.shape[1]),
+                    vector_count=int(self.index.ntotal),
+                    chunk_count=len(self.chunks),
+                ),
+                f,
+                ensure_ascii=False,
+                indent=2,
+            )
 
     def load(self) -> None:
-        if not self.faiss_path.exists() or not self.metadata_path.exists():
-            self.build(force=True)
-            return
-        self.index = _get_faiss().read_index(str(self.faiss_path))
-        with self.metadata_path.open("r", encoding="utf-8") as f:
-            raw_chunks = json.load(f)
-        self.chunks = [KBChunk(**item) for item in raw_chunks]
+        missing = [
+            str(path)
+            for path in (self.faiss_path, self.metadata_path, self.manifest_path)
+            if not path.exists()
+        ]
+        if missing:
+            raise IndexIncompatibleError(
+                "Campus KB index is not ready; missing "
+                + ", ".join(missing)
+                + ". Build it explicitly with --force."
+            )
+
+        try:
+            loaded_index = _get_faiss().read_index(str(self.faiss_path))
+        except Exception as exc:
+            raise IndexLoadError(f"Unable to read FAISS index {self.faiss_path}: {exc}") from exc
+
+        try:
+            with self.metadata_path.open("r", encoding="utf-8") as f:
+                raw_chunks = json.load(f)
+            loaded_chunks = [KBChunk(**item) for item in raw_chunks]
+        except Exception as exc:
+            raise IndexLoadError(
+                f"Unable to read chunk metadata {self.metadata_path}: {exc}"
+            ) from exc
+
+        self._validate_manifest(loaded_index, loaded_chunks)
+        self.index = loaded_index
+        self.chunks = loaded_chunks
         self.bm25 = BM25Okapi([_tokenize(self._embed_text(c)) for c in self.chunks])
+
+    def _manifest_payload(
+        self, vector_dim: int, vector_count: int, chunk_count: int
+    ) -> Dict[str, Any]:
+        kb_cfg = self.config["knowledge_base"]
+        return {
+            "schema_version": 1,
+            "embedding_model": model_identifier(self.embedding_model_name),
+            "source_sha256": file_sha256(self.kb_path),
+            "chunk_size": int(kb_cfg.get("chunk_size", 420)),
+            "chunk_overlap": int(kb_cfg.get("chunk_overlap", 80)),
+            "chunk_count": int(chunk_count),
+            "vector_count": int(vector_count),
+            "vector_dim": int(vector_dim),
+        }
+
+    def _validate_manifest(
+        self, loaded_index: Any, loaded_chunks: List[KBChunk]
+    ) -> None:
+        try:
+            with self.manifest_path.open("r", encoding="utf-8") as f:
+                manifest = json.load(f)
+        except Exception as exc:
+            raise IndexLoadError(
+                f"Unable to read index manifest {self.manifest_path}: {exc}"
+            ) from exc
+
+        try:
+            expected = self._manifest_payload(
+                vector_dim=int(loaded_index.d),
+                vector_count=int(loaded_index.ntotal),
+                chunk_count=len(loaded_chunks),
+            )
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise IndexIncompatibleError(
+                f"FAISS index dimensions are invalid; rebuild the index. ({exc})"
+            ) from exc
+
+        for field, expected_value in expected.items():
+            if manifest.get(field) != expected_value:
+                raise IndexIncompatibleError(
+                    f"Index manifest mismatch for {field}; rebuild the index with --force."
+                )
+
+        if len(loaded_chunks) != int(loaded_index.ntotal):
+            raise IndexIncompatibleError(
+                "Chunk metadata count does not match FAISS vector count; "
+                "rebuild the index with --force."
+            )
 
     def search(self, query: str, top_k: int | None = None) -> List[Dict[str, Any]]:
         if self.index is None or not self.chunks:
