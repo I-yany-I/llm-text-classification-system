@@ -18,6 +18,7 @@ retrieval:
   hybrid_enabled: true
   query_rewrite: true
   rrf_k: 60
+  max_chunks_per_doc: 2
   cross_encoder:
     enabled: true
     model_name: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
@@ -35,7 +36,8 @@ prompt:
   institution: 南京大学
   persona: 南京大学校园办事指南助手
   refusal_threshold: 0.18          # dense cosine; used when Cross-Encoder is off
-  refusal_ce_threshold: -0.25      # CE logit; out-of-scope phrases hold refuse cases that sat above this bar
+  refusal_ce_threshold: -0.25      # CE logit; explicit scope rules handle known out-of-scope queries
+  refusal_dense_fallback_threshold: 0.43  # strong dense match can rescue an overly conservative CE score
   refusal_doc_ids:
     - nju-support-unknown
   require_citations: true

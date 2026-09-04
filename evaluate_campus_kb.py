@@ -13,6 +13,17 @@ from src.campus_kb_rag.config import resolve_path
 
 
 DEFAULT_EVAL_QUESTIONS = "data/campus_kb/eval_questions.jsonl"
+DEFAULT_EVAL_SPLITS = {
+    "full": "data/campus_kb/eval_questions.jsonl",
+    "dev": "data/campus_kb/eval_questions_dev.jsonl",
+    "test": "data/campus_kb/eval_questions_test.jsonl",
+}
+
+
+def resolve_questions_source(questions: str | None, split: str) -> str:
+    if questions:
+        return questions
+    return DEFAULT_EVAL_SPLITS[split]
 
 
 def load_eval_questions(path: str | Path) -> List[Dict]:
@@ -83,8 +94,14 @@ def main() -> None:
     parser.add_argument("--config", default=None, help="主配置文件（可选；省略则用项目默认）")
     parser.add_argument(
         "--questions",
-        default=DEFAULT_EVAL_QUESTIONS,
-        help="评估问题集（可选；省略则用内置集）",
+        default=None,
+        help="评估问题集（可选；省略则根据 --split 选择内置集）",
+    )
+    parser.add_argument(
+        "--split",
+        choices=sorted(DEFAULT_EVAL_SPLITS),
+        default="full",
+        help="内置评估切分：full、dev 或 test",
     )
     parser.add_argument(
         "--output",
@@ -102,7 +119,7 @@ def main() -> None:
     rag = CampusKBRAG(config_path=args.config)
     rag.build_index(force=False)
 
-    questions = load_eval_questions(args.questions)
+    questions = load_eval_questions(resolve_questions_source(args.questions, args.split))
     print(f"Loaded {len(questions)} evaluation questions.")
 
     results = evaluate_cases(rag, questions, top_k=args.top_k)

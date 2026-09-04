@@ -38,6 +38,7 @@ class TestRefusalLogic:
             "prompt": {
                 "refusal_threshold": 0.18,
                 "refusal_ce_threshold": 0.0,
+                "refusal_dense_fallback_threshold": 0.43,
                 "refusal_doc_ids": ["nju-support-unknown"],
             },
             "generation": {"backend": "extractive"},
@@ -87,6 +88,17 @@ class TestRefusalLogic:
         assert evidence == []
         assert reason == "sentinel_document"
 
+    def test_lower_sentinel_document_is_removed_from_evidence(self, rag_with_config):
+        retrieved = [
+            {"doc_id": "nju-it-vpn", "score": 0.90, "text": "VPN"},
+            {"doc_id": "nju-support-unknown", "score": 0.80, "text": "unknown"},
+        ]
+
+        evidence, reason = rag_with_config._filter_low_confidence(retrieved)
+
+        assert [item["doc_id"] for item in evidence] == ["nju-it-vpn"]
+        assert reason is None
+
     def test_different_refusal_doc_ids(self, rag_with_config):
         rag_with_config.config["prompt"]["refusal_doc_ids"] = ["custom-refusal", "fallback-doc"]
         retrieved = [{"doc_id": "custom-refusal", "score": 0.90, "text": "..."}]
@@ -113,9 +125,9 @@ class TestRefusalLogic:
         retrieved = [
             {
                 "doc_id": "nju-it-vpn",
-                "dense_score": 0.51,
+                "dense_score": 0.31,
                 "cross_encoder_score": -1.2,
-                "score": 0.51,
+                "score": 0.31,
                 "text": "...",
             }
         ]
@@ -137,6 +149,45 @@ class TestRefusalLogic:
         ]
         evidence, reason = rag_with_config._filter_low_confidence(retrieved)
         assert len(evidence) == 1
+        assert reason is None
+
+    def test_strong_dense_match_can_rescue_negative_ce(self, rag_with_config):
+        rag_with_config.config["retrieval"]["cross_encoder"]["enabled"] = True
+        retrieved = [
+            {
+                "doc_id": "nju-fin-tuition",
+                "dense_score": 0.72,
+                "cross_encoder_score": -2.1,
+                "score": 0.72,
+                "text": "...",
+            }
+        ]
+        evidence, reason = rag_with_config._filter_low_confidence(retrieved)
+        assert len(evidence) == 1
+        assert reason is None
+
+    def test_best_among_top_candidates_can_rescue_negative_ce(
+        self, rag_with_config
+    ):
+        rag_with_config.config["retrieval"]["cross_encoder"]["enabled"] = True
+        retrieved = [
+            {
+                "doc_id": "nju-it-auth-activate",
+                "dense_score": 0.31,
+                "cross_encoder_score": -2.1,
+                "score": 0.31,
+                "text": "...",
+            },
+            {
+                "doc_id": "nju-it-auth-password",
+                "dense_score": 0.44,
+                "cross_encoder_score": -3.2,
+                "score": 0.44,
+                "text": "...",
+            },
+        ]
+        evidence, reason = rag_with_config._filter_low_confidence(retrieved)
+        assert len(evidence) == 2
         assert reason is None
 
     def test_out_of_scope_skips_retrieval(self, rag_with_config):
@@ -218,6 +269,33 @@ class TestRefusalLogic:
         assert result["citations"][0]["dense_score"] == pytest.approx(0.8)
         assert result["citations"][0]["rrf_score"] == pytest.approx(0.03)
         assert result["citations"][0]["cross_encoder_score"] == pytest.approx(1.2)
+
+    def test_ask_passes_rewritten_query_only_to_sparse_retrieval(self, rag_with_config):
+        rag_with_config.retriever = MagicMock()
+        rag_with_config.generator = MagicMock()
+        rag_with_config.generator.generate.return_value = "请使用 VPN。"
+        rag_with_config.retriever.search.return_value = [
+            {
+                "doc_id": "nju-it-vpn",
+                "title": "VPN 使用说明",
+                "department": "信息化中心",
+                "source": "test",
+                "updated_at": "2026-01-01",
+                "text": "校外访问请使用 VPN。",
+                "score": 0.8,
+                "dense_score": 0.8,
+            }
+        ]
+
+        query = "在家怎么访问校园网？"
+        result = rag_with_config.ask(query)
+
+        rag_with_config.retriever.search.assert_called_once_with(
+            query,
+            top_k=None,
+            sparse_query=result["search_query"],
+        )
+        assert "VPN" in result["search_query"]
 
 
 # ---------------------------------------------------------------------------

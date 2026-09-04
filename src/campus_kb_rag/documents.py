@@ -36,26 +36,53 @@ class KBChunk:
 
 def load_documents(jsonl_path: Path) -> List[KBDocument]:
     docs: List[KBDocument] = []
+    seen_ids = set()
     with jsonl_path.open("r", encoding="utf-8") as f:
         for line_no, line in enumerate(f, start=1):
             line = line.strip()
             if not line:
                 continue
-            raw = json.loads(line)
             try:
-                docs.append(
-                    KBDocument(
-                        id=str(raw["id"]),
-                        title=str(raw["title"]),
-                        department=str(raw.get("department", "")),
-                        source=str(raw.get("source", "")),
-                        updated_at=str(raw.get("updated_at", "")),
-                        tags=list(raw.get("tags", [])),
-                        text=str(raw["text"]),
+                raw = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{jsonl_path}:{line_no} invalid JSON: {exc.msg}") from exc
+
+            if not isinstance(raw, dict):
+                raise ValueError(f"{jsonl_path}:{line_no} record must be a JSON object")
+
+            for field in ("id", "title", "text"):
+                value = raw.get(field)
+                if not isinstance(value, str) or not value.strip():
+                    raise ValueError(
+                        f"{jsonl_path}:{line_no} field {field} must be a non-empty string"
                     )
+
+            doc_id = raw["id"]
+            if doc_id in seen_ids:
+                raise ValueError(
+                    f"{jsonl_path}:{line_no} duplicate document id: {doc_id}"
                 )
-            except KeyError as exc:
-                raise ValueError(f"{jsonl_path}:{line_no} missing field {exc}") from exc
+
+            tags = raw.get("tags", [])
+            if not isinstance(tags, list) or not all(
+                isinstance(tag, str) for tag in tags
+            ):
+                raise ValueError(
+                    f"{jsonl_path}:{line_no} field tags must be a list of strings"
+                )
+
+            seen_ids.add(doc_id)
+            docs.append(
+                KBDocument(
+                    id=doc_id,
+                    title=raw["title"],
+                    department=str(raw.get("department", "")),
+                    source=str(raw.get("source", "")),
+                    updated_at=str(raw.get("updated_at", "")),
+                    tags=list(tags),
+                    text=raw["text"],
+                )
+            )
     return docs
 
 

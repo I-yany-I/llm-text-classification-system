@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -97,6 +100,7 @@ class CampusKBRetriever:
         kb_cfg = config["knowledge_base"]
         idx_cfg = config["index"]
         ret_cfg = config["retrieval"]
+        self._validate_retrieval_config(ret_cfg)
 
         self.kb_path = Path(kb_cfg["_resolved_path"])
         self.index_dir = Path(idx_cfg["_resolved_dir"])
@@ -111,6 +115,51 @@ class CampusKBRetriever:
         self.index = None
         self.bm25 = None
         self._cross_encoder = None
+
+    @staticmethod
+    def _validate_retrieval_config(ret_cfg: Dict[str, Any]) -> None:
+        if not isinstance(ret_cfg, dict):
+            raise ValueError("retrieval must be a mapping")
+
+        defaults = {
+            "dense_top_k": 12,
+            "bm25_top_k": 12,
+            "final_top_k": 5,
+            "rrf_k": 60,
+        }
+        for field, default in defaults.items():
+            value = ret_cfg.get(field, default)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"retrieval.{field} must be a positive integer")
+
+        max_chunks_per_doc = ret_cfg.get("max_chunks_per_doc", 2)
+        if (
+            isinstance(max_chunks_per_doc, bool)
+            or not isinstance(max_chunks_per_doc, int)
+            or max_chunks_per_doc <= 0
+        ):
+            raise ValueError(
+                "retrieval.max_chunks_per_doc must be a positive integer"
+            )
+
+        cross_encoder_cfg = ret_cfg.get("cross_encoder", {})
+        if not isinstance(cross_encoder_cfg, dict):
+            raise ValueError("retrieval.cross_encoder must be a mapping")
+        enabled = cross_encoder_cfg.get("enabled", False)
+        if not isinstance(enabled, bool):
+            raise ValueError("retrieval.cross_encoder.enabled must be a boolean")
+        if "rerank_pool" in cross_encoder_cfg:
+            value = cross_encoder_cfg["rerank_pool"]
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(
+                    "retrieval.cross_encoder.rerank_pool must be a positive integer"
+                )
+        if enabled:
+            model_name = cross_encoder_cfg.get("model_name")
+            if not isinstance(model_name, str) or not model_name.strip():
+                raise ValueError(
+                    "retrieval.cross_encoder.model_name must be a non-empty path"
+                )
 
     def _get_embedder(self):
         if self._embedder is None:
@@ -133,41 +182,71 @@ class CampusKBRetriever:
 
         docs = load_documents(self.kb_path)
         kb_cfg = self.config["knowledge_base"]
-        self.chunks = chunk_documents(
+        built_chunks = chunk_documents(
             docs,
             chunk_size=int(kb_cfg.get("chunk_size", 420)),
             chunk_overlap=int(kb_cfg.get("chunk_overlap", 80)),
         )
-        if not self.chunks:
+        if not built_chunks:
             raise ValueError(f"No chunks loaded from {self.kb_path}")
 
         embeddings = self._get_embedder().encode(
-            [self._embed_text(c) for c in self.chunks],
+            [self._embed_text(c) for c in built_chunks],
             convert_to_numpy=True,
             show_progress_bar=True,
         ).astype("float32")
         faiss_module = _get_faiss()
         faiss_module.normalize_L2(embeddings)
 
-        self.index = faiss_module.IndexFlatIP(embeddings.shape[1])
-        self.index.add(embeddings)
-        self.bm25 = BM25Okapi([_tokenize(self._embed_text(c)) for c in self.chunks])
+        built_index = faiss_module.IndexFlatIP(embeddings.shape[1])
+        built_index.add(embeddings)
+        built_bm25 = BM25Okapi([_tokenize(self._embed_text(c)) for c in built_chunks])
 
         self.index_dir.mkdir(parents=True, exist_ok=True)
-        faiss_module.write_index(self.index, str(self.faiss_path))
-        with self.metadata_path.open("w", encoding="utf-8") as f:
-            json.dump([c.to_dict() for c in self.chunks], f, ensure_ascii=False, indent=2)
-        with self.manifest_path.open("w", encoding="utf-8") as f:
-            json.dump(
-                self._manifest_payload(
-                    vector_dim=int(embeddings.shape[1]),
-                    vector_count=int(self.index.ntotal),
-                    chunk_count=len(self.chunks),
-                ),
-                f,
-                ensure_ascii=False,
-                indent=2,
+        temp_dir = Path(
+            tempfile.mkdtemp(
+                prefix=".campus-kb-build-",
+                dir=str(self.index_dir.parent),
             )
+        )
+        staged_paths = {
+            self.faiss_path: temp_dir / "faiss.index",
+            self.metadata_path: temp_dir / "chunks.json",
+            self.manifest_path: temp_dir / "manifest.json",
+        }
+        try:
+            faiss_module.write_index(built_index, str(staged_paths[self.faiss_path]))
+            with staged_paths[self.metadata_path].open("w", encoding="utf-8") as f:
+                json.dump(
+                    [chunk.to_dict() for chunk in built_chunks],
+                    f,
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            with staged_paths[self.manifest_path].open("w", encoding="utf-8") as f:
+                json.dump(
+                    self._manifest_payload(
+                        vector_dim=int(embeddings.shape[1]),
+                        vector_count=int(built_index.ntotal),
+                        chunk_count=len(built_chunks),
+                    ),
+                    f,
+                    ensure_ascii=False,
+                    indent=2,
+                )
+
+            self._read_and_validate_artifacts(
+                staged_paths[self.faiss_path],
+                staged_paths[self.metadata_path],
+                staged_paths[self.manifest_path],
+            )
+            self._publish_artifacts(staged_paths)
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+        self.index = built_index
+        self.chunks = built_chunks
+        self.bm25 = built_bm25
 
     def load(self) -> None:
         missing = [
@@ -182,24 +261,73 @@ class CampusKBRetriever:
                 + ". Build it explicitly with --force."
             )
 
+        loaded_index, loaded_chunks = self._read_and_validate_artifacts(
+            self.faiss_path,
+            self.metadata_path,
+            self.manifest_path,
+        )
+        self.index = loaded_index
+        self.chunks = loaded_chunks
+        self.bm25 = BM25Okapi([_tokenize(self._embed_text(c)) for c in self.chunks])
+
+    def _read_and_validate_artifacts(
+        self,
+        faiss_path: Path,
+        metadata_path: Path,
+        manifest_path: Path,
+    ) -> tuple[Any, List[KBChunk]]:
         try:
-            loaded_index = _get_faiss().read_index(str(self.faiss_path))
+            loaded_index = _get_faiss().read_index(str(faiss_path))
         except Exception as exc:
-            raise IndexLoadError(f"Unable to read FAISS index {self.faiss_path}: {exc}") from exc
+            raise IndexLoadError(f"Unable to read FAISS index {faiss_path}: {exc}") from exc
 
         try:
-            with self.metadata_path.open("r", encoding="utf-8") as f:
+            with metadata_path.open("r", encoding="utf-8") as f:
                 raw_chunks = json.load(f)
             loaded_chunks = [KBChunk(**item) for item in raw_chunks]
         except Exception as exc:
             raise IndexLoadError(
-                f"Unable to read chunk metadata {self.metadata_path}: {exc}"
+                f"Unable to read chunk metadata {metadata_path}: {exc}"
             ) from exc
 
-        self._validate_manifest(loaded_index, loaded_chunks)
-        self.index = loaded_index
-        self.chunks = loaded_chunks
-        self.bm25 = BM25Okapi([_tokenize(self._embed_text(c)) for c in self.chunks])
+        self._validate_manifest(
+            loaded_index,
+            loaded_chunks,
+            manifest_path=manifest_path,
+        )
+        return loaded_index, loaded_chunks
+
+    def _publish_artifacts(self, staged_paths: Dict[Path, Path]) -> None:
+        targets = list(staged_paths)
+        backup_dir = Path(
+            tempfile.mkdtemp(
+                prefix=".campus-kb-backup-",
+                dir=str(self.index_dir.parent),
+            )
+        )
+        backups: Dict[Path, Path] = {}
+        replaced: List[Path] = []
+        try:
+            for target in targets:
+                if target.exists():
+                    backup = backup_dir / target.name
+                    shutil.copy2(target, backup)
+                    backups[target] = backup
+
+            for target in targets:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(staged_paths[target], target)
+                replaced.append(target)
+        except Exception:
+            for target in reversed(replaced):
+                backup = backups.get(target)
+                if backup is not None and backup.exists():
+                    os.replace(backup, target)
+                else:
+                    target.unlink(missing_ok=True)
+            raise
+        finally:
+            shutil.rmtree(backup_dir, ignore_errors=True)
 
     def _manifest_payload(
         self, vector_dim: int, vector_count: int, chunk_count: int
@@ -217,14 +345,18 @@ class CampusKBRetriever:
         }
 
     def _validate_manifest(
-        self, loaded_index: Any, loaded_chunks: List[KBChunk]
+        self,
+        loaded_index: Any,
+        loaded_chunks: List[KBChunk],
+        manifest_path: Path | None = None,
     ) -> None:
+        manifest_path = manifest_path or self.manifest_path
         try:
-            with self.manifest_path.open("r", encoding="utf-8") as f:
+            with manifest_path.open("r", encoding="utf-8") as f:
                 manifest = json.load(f)
         except Exception as exc:
             raise IndexLoadError(
-                f"Unable to read index manifest {self.manifest_path}: {exc}"
+                f"Unable to read index manifest {manifest_path}: {exc}"
             ) from exc
 
         try:
@@ -250,7 +382,12 @@ class CampusKBRetriever:
                 "rebuild the index with --force."
             )
 
-    def search(self, query: str, top_k: int | None = None) -> List[Dict[str, Any]]:
+    def search(
+        self,
+        query: str,
+        top_k: int | None = None,
+        sparse_query: str | None = None,
+    ) -> List[Dict[str, Any]]:
         self._validate_top_k(top_k)
         if self.index is None or not self.chunks:
             self.load()
@@ -271,7 +408,7 @@ class CampusKBRetriever:
         dense_ids, dense_scores = self._dense_search(query_vec, dense_k)
         dense_map = {idx: score for idx, score in zip(dense_ids, dense_scores)}
         if ret_cfg.get("hybrid_enabled", True):
-            bm25_ids = self._bm25_search(query, bm25_k)
+            bm25_ids = self._bm25_search(sparse_query or query, bm25_k)
             fused = _rrf([dense_ids, bm25_ids], int(ret_cfg.get("rrf_k", 60)))
             candidate_ids = sorted(fused, key=lambda idx: -fused[idx])[: max(final_k, bm25_k)]
             rrf_map = fused
@@ -293,6 +430,10 @@ class CampusKBRetriever:
         if ce_cfg.get("enabled", False) and candidates:
             candidates = self._rerank_cross_encoder(query, candidates, ce_cfg)
         candidates = prefer_topic_docs(query, candidates)
+        candidates = self._limit_chunks_per_doc(
+            candidates,
+            int(ret_cfg.get("max_chunks_per_doc", 2)),
+        )
         return candidates[:final_k]
 
     @staticmethod
@@ -352,6 +493,22 @@ class CampusKBRetriever:
         item = chunk.to_dict()
         item["score"] = float(score)
         return item
+
+    @staticmethod
+    def _limit_chunks_per_doc(
+        candidates: List[Dict[str, Any]],
+        max_chunks_per_doc: int,
+    ) -> List[Dict[str, Any]]:
+        counts: Dict[str, int] = {}
+        limited: List[Dict[str, Any]] = []
+        for item in candidates:
+            doc_id = str(item.get("doc_id") or item.get("chunk_id") or "")
+            count = counts.get(doc_id, 0)
+            if count >= max_chunks_per_doc:
+                continue
+            counts[doc_id] = count + 1
+            limited.append(item)
+        return limited
 
     @staticmethod
     def _embed_text(chunk: KBChunk) -> str:

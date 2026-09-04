@@ -22,8 +22,11 @@ def citation_hit_rate(results: Iterable[Dict]) -> float:
     return hits / len(evaluable) if evaluable else 0.0
 
 
-def citation_recall_at_k(results: Iterable[Dict]) -> float:
+def citation_recall_at_k(results: Iterable[Dict], k: int | None = None) -> float:
     """所有期望文档 ID 中被检索到的比例（排除 should_refuse）。"""
+    if k is not None and (isinstance(k, bool) or not isinstance(k, int) or k <= 0):
+        raise ValueError("k must be a positive integer")
+
     rows = [r for r in results if not r.get("should_refuse")]
     total_expected = 0
     total_hit = 0
@@ -31,10 +34,35 @@ def citation_recall_at_k(results: Iterable[Dict]) -> float:
         expected = set(row.get("expected_doc_ids", []))
         if not expected:
             continue
-        retrieved = {c.get("doc_id") for c in row.get("citations", [])}
+        citations = row.get("citations", [])
+        if k is not None:
+            citations = citations[:k]
+        retrieved = {c.get("doc_id") for c in citations}
         total_expected += len(expected)
         total_hit += len(expected.intersection(retrieved))
     return total_hit / total_expected if total_expected > 0 else 0.0
+
+
+def citation_mrr(results: Iterable[Dict]) -> float:
+    """平均首个期望文档倒数排名（排除 should_refuse）。"""
+    rows = [
+        r
+        for r in results
+        if not r.get("should_refuse") and r.get("expected_doc_ids")
+    ]
+    if not rows:
+        return 0.0
+
+    reciprocal_ranks = []
+    for row in rows:
+        expected = set(row.get("expected_doc_ids", []))
+        reciprocal_rank = 0.0
+        for rank, citation in enumerate(row.get("citations", []), start=1):
+            if citation.get("doc_id") in expected:
+                reciprocal_rank = 1.0 / rank
+                break
+        reciprocal_ranks.append(reciprocal_rank)
+    return sum(reciprocal_ranks) / len(reciprocal_ranks)
 
 
 def refusal_accuracy(results: Iterable[Dict]) -> float:
@@ -68,6 +96,11 @@ def summarize(results: List[Dict]) -> Dict[str, float]:
     return {
         "citation_hit_rate": round(citation_hit_rate(rows), 4),
         "citation_recall_at_k": round(citation_recall_at_k(rows), 4),
+        "citation_mrr": round(citation_mrr(rows), 4),
+        "citation_recall_at_1": round(citation_recall_at_k(rows, 1), 4),
+        "citation_recall_at_3": round(citation_recall_at_k(rows, 3), 4),
+        "citation_recall_at_5": round(citation_recall_at_k(rows, 5), 4),
+        "citation_recall_at_8": round(citation_recall_at_k(rows, 8), 4),
         "refusal_accuracy": round(refusal_accuracy(rows), 4),
         "false_refusal_rate": round(false_refusal_rate(rows), 4),
         "n_total": len(rows),

@@ -5,6 +5,7 @@ Run from project root:
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -248,6 +249,91 @@ class TestRetrieverSearch:
         assert results[0]["score"] == pytest.approx(0.40)
         assert results[0]["cross_encoder_score"] == pytest.approx(4.0)
 
+    def test_search_separates_dense_rerank_and_sparse_queries(self, mock_config):
+        mock_config["retrieval"]["cross_encoder"] = {
+            "enabled": True,
+            "model_name": "unused",
+            "rerank_pool": 3,
+        }
+        retriever = CampusKBRetriever(mock_config)
+        retriever.load = MagicMock()
+        retriever.index = MagicMock(ntotal=1)
+        retriever.chunks = [
+            KBChunk(
+                chunk_id="doc-0-0",
+                doc_id="doc-0",
+                title="校园网",
+                text="校园网访问说明",
+                department="IT",
+                source="test",
+                tags=["校园网"],
+                updated_at="2026-01-01",
+            )
+        ]
+        retriever._encode_query = MagicMock(
+            return_value=np.zeros((1, 4), dtype="float32")
+        )
+        retriever._dense_search = MagicMock(return_value=([0], [0.8]))
+        retriever._bm25_search = MagicMock(return_value=[0])
+        retriever._rerank_cross_encoder = MagicMock(
+            side_effect=lambda query, candidates, ce_cfg: candidates
+        )
+
+        retriever.search("原始问题", sparse_query="原始问题 扩展词")
+
+        retriever._encode_query.assert_called_once_with("原始问题")
+        retriever._bm25_search.assert_called_once_with("原始问题 扩展词", 12)
+        assert retriever._rerank_cross_encoder.call_args.args[0] == "原始问题"
+
+    def test_search_limits_chunks_per_document(self, mock_config):
+        mock_config["retrieval"]["max_chunks_per_doc"] = 1
+        retriever = CampusKBRetriever(mock_config)
+        retriever.load = MagicMock()
+        retriever.index = MagicMock(ntotal=3)
+        retriever.chunks = [
+            KBChunk(
+                chunk_id="doc-a-0",
+                doc_id="doc-a",
+                title="文档 A",
+                text="片段 A0",
+                department="IT",
+                source="test",
+                tags=[],
+                updated_at="2026-01-01",
+            ),
+            KBChunk(
+                chunk_id="doc-a-1",
+                doc_id="doc-a",
+                title="文档 A",
+                text="片段 A1",
+                department="IT",
+                source="test",
+                tags=[],
+                updated_at="2026-01-01",
+            ),
+            KBChunk(
+                chunk_id="doc-b-0",
+                doc_id="doc-b",
+                title="文档 B",
+                text="片段 B0",
+                department="IT",
+                source="test",
+                tags=[],
+                updated_at="2026-01-01",
+            ),
+        ]
+        retriever._encode_query = MagicMock(
+            return_value=np.zeros((1, 4), dtype="float32")
+        )
+        retriever._dense_search = MagicMock(
+            return_value=([0, 1, 2], [0.9, 0.8, 0.7])
+        )
+        retriever._bm25_search = MagicMock(return_value=[0, 1, 2])
+
+        results = retriever.search("测试问题")
+
+        assert [item["doc_id"] for item in results] == ["doc-a", "doc-b"]
+
     def test_retriever_does_not_load_embedder_on_construction(self, mock_config):
         with patch("src.campus_kb_rag.retriever.SentenceTransformer") as model:
             retriever = CampusKBRetriever(mock_config)
@@ -264,6 +350,25 @@ class TestRetrieverSearch:
             assert retriever._get_embedder() is fake_embedder
             assert retriever._get_embedder() is fake_embedder
         model.assert_called_once_with(retriever.embedding_model_name)
+
+    @pytest.mark.parametrize(
+        "field",
+        ["dense_top_k", "bm25_top_k", "final_top_k", "rrf_k"],
+    )
+    def test_retriever_rejects_invalid_retrieval_setting(self, mock_config, field):
+        mock_config["retrieval"][field] = 0
+
+        with pytest.raises(ValueError, match=field):
+            CampusKBRetriever(mock_config)
+
+    def test_invalid_retrieval_setting_fails_before_embedder_access(self, mock_config):
+        mock_config["retrieval"]["dense_top_k"] = -1
+
+        with patch("src.campus_kb_rag.retriever.SentenceTransformer") as model:
+            with pytest.raises(ValueError, match="dense_top_k"):
+                CampusKBRetriever(mock_config)
+
+        model.assert_not_called()
 
     @pytest.mark.parametrize("top_k", [0, -1, 1.5, True])
     def test_search_rejects_invalid_top_k_before_encoding(self, mock_config, top_k):
@@ -471,6 +576,79 @@ def test_build_writes_manifest_without_loading_real_model(tmp_path):
     assert manifest["chunk_count"] == 1
     assert manifest["vector_count"] == 1
     assert manifest["vector_dim"] == 4
+
+
+def test_failed_build_preserves_existing_artifacts(tmp_path, monkeypatch):
+    kb_path = tmp_path / "kb.jsonl"
+    kb_path.write_text(
+        json.dumps(
+            {
+                "id": "doc-1",
+                "title": "校园卡补办",
+                "department": "信息化中心",
+                "source": "https://example.com",
+                "updated_at": "2026-08-01",
+                "tags": ["校园卡"],
+                "text": "校园卡遗失后请先挂失，再携带证件前往服务大厅补办。",
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    index_dir = tmp_path / "index"
+    index_dir.mkdir()
+    old_files = {
+        index_dir / "faiss.index": b"old-faiss",
+        index_dir / "chunks.json": b"old-metadata",
+        index_dir / "manifest.json": b"old-manifest",
+    }
+    for path, content in old_files.items():
+        path.write_bytes(content)
+
+    config = {
+        "knowledge_base": {
+            "_resolved_path": str(kb_path),
+            "chunk_size": 420,
+            "chunk_overlap": 80,
+        },
+        "index": {
+            "_resolved_dir": str(index_dir),
+            "_resolved_faiss_path": str(index_dir / "faiss.index"),
+            "_resolved_metadata_path": str(index_dir / "chunks.json"),
+        },
+        "retrieval": {
+            "embedding_model": "test-model",
+            "cross_encoder": {"enabled": False},
+        },
+    }
+    fake_embedder = MagicMock()
+    fake_embedder.encode.return_value = np.ones((1, 4), dtype="float32")
+    retriever = CampusKBRetriever(config)
+
+    real_replace = os.replace
+    calls = {"count": 0}
+
+    def fail_second_replace(source, target):
+        calls["count"] += 1
+        if calls["count"] == 2:
+            raise OSError("simulated publish failure")
+        return real_replace(source, target)
+
+    monkeypatch.setattr(os, "replace", fail_second_replace)
+    with patch(
+        "src.campus_kb_rag.retriever.SentenceTransformer",
+        return_value=fake_embedder,
+    ):
+        with pytest.raises(OSError, match="simulated publish failure"):
+            retriever.build(force=True)
+
+    for path, content in old_files.items():
+        assert path.read_bytes() == content
+    assert not list(tmp_path.glob(".campus-kb-build-*"))
+    assert retriever.index is None
+    assert retriever.chunks == []
+    assert retriever.bm25 is None
 
 
 # ---------------------------------------------------------------------------

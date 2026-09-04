@@ -1,34 +1,25 @@
 {"id": "q-vpn-01", "question": "校外怎么访问学校的数据库和教务系统？", "expected_doc_ids": ["nju-it-vpn"], "should_refuse": false, "category": "it"}
 {"id": "q-vpn-02", "question": "VPN 连接失败怎么办？", "expected_doc_ids": ["nju-it-vpn"], "should_refuse": false, "category": "it"}
 {"id": "q-vpn-03", "question": "在家能用校园网吗？", "expected_doc_ids": ["nju-it-vpn"], "should_refuse": false, "category": "it"}
-{"id": "q-auth-01", "question": "统一身份认证密码忘了怎么找回？", "expected_doc_ids": ["nju-it-auth-password"], "should_refuse": false, "category": "it"}
-{"id": "q-auth-02", "question": "忘记门户登录密码了，手机也换了，怎么重置？", "expected_doc_ids": ["nju-it-auth-password"], "should_refuse": false, "category": "it"}
 {"id": "q-auth-03", "question": "新生怎么激活学校账号？", "expected_doc_ids": ["nju-it-auth-activate"], "should_refuse": false, "category": "it"}
 {"id": "q-auth-04", "question": "入学后第一次登录教务系统需要先做什么？", "expected_doc_ids": ["nju-it-auth-activate"], "should_refuse": false, "category": "it"}
 {"id": "q-auth-05", "question": "统一身份认证是什么，能登录哪些系统？", "expected_doc_ids": ["nju-it-auth-login"], "should_refuse": false, "category": "it"}
 {"id": "q-email-01", "question": "学校邮箱怎么配置到手机上？", "expected_doc_ids": ["nju-it-email-client", "nju-it-email"], "should_refuse": false, "category": "it"}
 {"id": "q-email-02", "question": "学生邮箱的地址格式是什么？", "expected_doc_ids": ["nju-it-email"], "should_refuse": false, "category": "it"}
-{"id": "q-software-01", "question": "学校有没有免费的 Office 可以用？", "expected_doc_ids": ["nju-it-software-office"], "should_refuse": false, "category": "it"}
 {"id": "q-software-02", "question": "MATLAB 怎么通过学校授权安装？", "expected_doc_ids": ["nju-it-software-matlab"], "should_refuse": false, "category": "it"}
 {"id": "q-wifi-01", "question": "宿舍 WiFi 连上之后上不了网怎么办？", "expected_doc_ids": ["nju-it-wifi", "nju-it-wired"], "should_refuse": false, "category": "it"}
-{"id": "q-wifi-02", "question": "校园网认证怎么操作？", "expected_doc_ids": ["nju-it-wifi"], "should_refuse": false, "category": "it"}
 {"id": "q-repair-01", "question": "宿舍网络故障应该向哪里报修？", "expected_doc_ids": ["nju-it-repair"], "should_refuse": false, "category": "it"}
-{"id": "q-security-01", "question": "收到一封邮件说账号异常要求输入密码，怎么处理？", "expected_doc_ids": ["nju-it-security"], "should_refuse": false, "category": "it"}
 {"id": "q-course-01", "question": "选课系统什么时候开放，怎么用？", "expected_doc_ids": ["nju-ac-course-select"], "should_refuse": false, "category": "academic"}
 {"id": "q-course-02", "question": "选课满了怎么办，还有机会选上吗？", "expected_doc_ids": ["nju-ac-course-add", "nju-ac-course-select"], "should_refuse": false, "category": "academic"}
 {"id": "q-course-03", "question": "课选错了能退掉吗？", "expected_doc_ids": ["nju-ac-course-drop"], "should_refuse": false, "category": "academic"}
-{"id": "q-course-04", "question": "过了退课时间还能退课吗？", "expected_doc_ids": ["nju-ac-course-drop"], "should_refuse": false, "category": "academic"}
 {"id": "q-grade-01", "question": "成绩什么时候出来，在哪里查？", "expected_doc_ids": ["nju-ac-grade-query"], "should_refuse": false, "category": "academic"}
-{"id": "q-grade-02", "question": "觉得成绩录入有误，怎么申请复核？", "expected_doc_ids": ["nju-ac-grade-review"], "should_refuse": false, "category": "academic"}
 {"id": "q-gpa-01", "question": "GPA 是怎么计算的？重修了会影响 GPA 吗？", "expected_doc_ids": ["nju-ac-gpa", "nju-ac-retake"], "should_refuse": false, "category": "academic"}
 {"id": "q-exam-01", "question": "考试当天生病了，可以申请推迟考试吗？", "expected_doc_ids": ["nju-ac-exam-defer"], "should_refuse": false, "category": "academic"}
-{"id": "q-exam-02", "question": "期末挂科了，有补考机会吗？", "expected_doc_ids": ["nju-ac-exam-makeup"], "should_refuse": false, "category": "academic"}
 {"id": "q-retake-01", "question": "课程不及格能重修吗，怎么申请？", "expected_doc_ids": ["nju-ac-retake"], "should_refuse": false, "category": "academic"}
 {"id": "q-transcript-01", "question": "怎么开具成绩单，需要多长时间？", "expected_doc_ids": ["nju-ac-transcript"], "should_refuse": false, "category": "academic"}
 {"id": "q-transcript-02", "question": "申请出国用的英文成绩单怎么办理？", "expected_doc_ids": ["nju-ac-transcript-en"], "should_refuse": false, "category": "academic"}
 {"id": "q-enrollment-01", "question": "银行开户需要在读证明，在哪里开？", "expected_doc_ids": ["nju-ac-enrollment"], "should_refuse": false, "category": "academic"}
 {"id": "q-status-01", "question": "学信网显示的学籍信息不对，找谁处理？", "expected_doc_ids": ["nju-ac-status"], "should_refuse": false, "category": "academic"}
-{"id": "q-major-01", "question": "我想转专业，需要满足什么条件？", "expected_doc_ids": ["nju-ac-major-transfer"], "should_refuse": false, "category": "academic"}
 {"id": "q-minor-01", "question": "辅修和双学位有什么区别，怎么申请？", "expected_doc_ids": ["nju-ac-minor"], "should_refuse": false, "category": "academic"}
 {"id": "q-grad-01", "question": "毕业的时候怎么审核学分是否满足要求？", "expected_doc_ids": ["nju-ac-graduation"], "should_refuse": false, "category": "academic"}
 {"id": "q-thesis-01", "question": "毕业论文有什么格式和查重要求？", "expected_doc_ids": ["nju-ac-thesis"], "should_refuse": false, "category": "academic"}
@@ -38,49 +29,33 @@
 {"id": "q-dorm-01", "question": "宿舍灯坏了怎么报修？", "expected_doc_ids": ["nju-stu-dorm-repair"], "should_refuse": false, "category": "student"}
 {"id": "q-leave-01", "question": "请病假需要什么手续？", "expected_doc_ids": ["nju-stu-leave"], "should_refuse": false, "category": "student"}
 {"id": "q-scholarship-01", "question": "奖学金怎么申请，有什么条件？", "expected_doc_ids": ["nju-stu-scholarship"], "should_refuse": false, "category": "student"}
-{"id": "q-grant-01", "question": "家里比较困难，怎么申请助学金？", "expected_doc_ids": ["nju-stu-grant"], "should_refuse": false, "category": "student"}
 {"id": "q-studentid-01", "question": "学生证丢了怎么补办？", "expected_doc_ids": ["nju-stu-student-id"], "should_refuse": false, "category": "student"}
 {"id": "q-refuse-01", "question": "我今天的期末成绩是多少？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
 {"id": "q-refuse-02", "question": "食堂今天几点关门？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
-{"id": "q-refuse-03", "question": "帮我登录教务系统看一下我有没有挂科。", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
 {"id": "q-refuse-04", "question": "学校医院门诊怎么报销医疗费用？", "expected_doc_ids": ["nju-stu-clinic", "nju-stu-insurance"], "should_refuse": false, "category": "student"}
-{"id": "q-refuse-05", "question": "我档案现在在哪里，怎么提取？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
 {"id": "q-portal-01", "question": "学校信息门户登录入口在哪里？", "expected_doc_ids": ["nju-it-portal"], "should_refuse": false, "category": "it"}
 {"id": "q-app-01", "question": "南京大学官方手机 App 在哪里下载？", "expected_doc_ids": ["nju-it-mobile-app"], "should_refuse": false, "category": "it"}
-{"id": "q-cloud-01", "question": "学校有提供网盘或 OneDrive 吗？", "expected_doc_ids": ["nju-it-cloud"], "should_refuse": false, "category": "it"}
-{"id": "q-meeting-01", "question": "学校有 Zoom 或腾讯会议的授权账号吗？", "expected_doc_ids": ["nju-it-meeting"], "should_refuse": false, "category": "it"}
 {"id": "q-mooc-01", "question": "在哪里看在线课程的回放？", "expected_doc_ids": ["nju-it-mooc"], "should_refuse": false, "category": "it"}
-{"id": "q-print-01", "question": "在校园里怎么打印文件？", "expected_doc_ids": ["nju-it-print"], "should_refuse": false, "category": "it"}
 {"id": "q-traffic-01", "question": "怎么查我这个月校园网用了多少流量？", "expected_doc_ids": ["nju-it-traffic"], "should_refuse": false, "category": "it"}
-{"id": "q-software-others-01", "question": "学校能用 Adobe 或 EndNote 吗？", "expected_doc_ids": ["nju-it-software-others"], "should_refuse": false, "category": "it"}
 {"id": "q-curriculum-01", "question": "我专业的培养方案在哪里查？", "expected_doc_ids": ["nju-ac-curriculum"], "should_refuse": false, "category": "academic"}
-{"id": "q-credits-01", "question": "通识课和专业课的学分分别要修多少？", "expected_doc_ids": ["nju-ac-credits", "nju-ac-curriculum"], "should_refuse": false, "category": "academic"}
 {"id": "q-schedule-01", "question": "怎么把课表导出到手机日历？", "expected_doc_ids": ["nju-ac-schedule"], "should_refuse": false, "category": "academic"}
 {"id": "q-exam-schedule-01", "question": "期末考试时间和考场在哪里查？", "expected_doc_ids": ["nju-ac-exam-schedule"], "should_refuse": false, "category": "academic"}
 {"id": "q-exam-discipline-01", "question": "考试作弊会受到什么处分？", "expected_doc_ids": ["nju-ac-exam-discipline"], "should_refuse": false, "category": "academic"}
-{"id": "q-attendance-01", "question": "旷课会扣平时分吗？", "expected_doc_ids": ["nju-ac-attendance"], "should_refuse": false, "category": "academic"}
-{"id": "q-cross-school-01", "question": "可以去南京其他大学选课吗？", "expected_doc_ids": ["nju-ac-cross-school"], "should_refuse": false, "category": "academic"}
 {"id": "q-summer-01", "question": "暑期学校怎么报名？", "expected_doc_ids": ["nju-ac-summer"], "should_refuse": false, "category": "academic"}
 {"id": "q-recommend-01", "question": "保研需要满足什么条件？", "expected_doc_ids": ["nju-ac-recommend"], "should_refuse": false, "category": "academic"}
 {"id": "q-exchange-01", "question": "我去国外交换的课程能换学分吗？", "expected_doc_ids": ["nju-ac-exchange"], "should_refuse": false, "category": "academic"}
 {"id": "q-warning-01", "question": "学业警告是怎么回事？", "expected_doc_ids": ["nju-ac-warning"], "should_refuse": false, "category": "academic"}
-{"id": "q-cet-01", "question": "四六级考试怎么报名？", "expected_doc_ids": ["nju-ac-cet"], "should_refuse": false, "category": "academic"}
 {"id": "q-database-01", "question": "在校外怎么用知网下载论文？", "expected_doc_ids": ["nju-stu-lib-database", "nju-it-vpn"], "should_refuse": false, "category": "student"}
 {"id": "q-room-01", "question": "图书馆研讨间怎么预约？", "expected_doc_ids": ["nju-stu-lib-room"], "should_refuse": false, "category": "student"}
-{"id": "q-pe-01", "question": "体测要考哪些项目？", "expected_doc_ids": ["nju-stu-pe"], "should_refuse": false, "category": "student"}
 {"id": "q-counseling-01", "question": "心理压力大想找人聊聊，学校有这个服务吗？", "expected_doc_ids": ["nju-stu-counseling"], "should_refuse": false, "category": "student"}
-{"id": "q-clinic-01", "question": "校医院看病怎么挂号？", "expected_doc_ids": ["nju-stu-clinic"], "should_refuse": false, "category": "student"}
 {"id": "q-insurance-01", "question": "放假回家在老家看病能用学生医保吗？", "expected_doc_ids": ["nju-stu-insurance"], "should_refuse": false, "category": "student"}
 {"id": "q-lost-01", "question": "学生证在教学楼丢了，去哪里找？", "expected_doc_ids": ["nju-stu-lost-found"], "should_refuse": false, "category": "student"}
 {"id": "q-employment-01", "question": "三方协议怎么办理盖章？", "expected_doc_ids": ["nju-stu-employment"], "should_refuse": false, "category": "student"}
 {"id": "q-archive-01", "question": "毕业后档案会去哪里？", "expected_doc_ids": ["nju-stu-archive"], "should_refuse": false, "category": "student"}
-{"id": "q-checkout-01", "question": "毕业前要办哪些离校手续？", "expected_doc_ids": ["nju-stu-checkout"], "should_refuse": false, "category": "student"}
-{"id": "q-tuition-01", "question": "学费怎么交，能用支付宝吗？", "expected_doc_ids": ["nju-fin-tuition"], "should_refuse": false, "category": "finance"}
 {"id": "q-utility-01", "question": "宿舍电费用完了怎么充？", "expected_doc_ids": ["nju-fin-utility"], "should_refuse": false, "category": "finance"}
 {"id": "q-passport-01", "question": "办护照学校能开什么证明？", "expected_doc_ids": ["nju-intl-passport"], "should_refuse": false, "category": "international"}
 {"id": "q-visa-01", "question": "申请留学签证需要学校开哪些材料？", "expected_doc_ids": ["nju-intl-visa", "nju-ac-transcript-en", "nju-ac-enrollment"], "should_refuse": false, "category": "international"}
 {"id": "q-multi-082", "question": "VPN 连不上，而且统一身份认证密码也忘了，应该先处理哪个？分别怎么办？", "expected_doc_ids": ["nju-it-vpn", "nju-it-auth-password"], "should_refuse": false, "category": "it"}
-{"id": "q-multi-083", "question": "在校外用 VPN 访问教务系统选课，但选课系统一直繁忙，有什么办法？", "expected_doc_ids": ["nju-it-vpn", "nju-ac-course-select"], "should_refuse": false, "category": "it"}
 {"id": "q-multi-084", "question": "大一新生入学，怎么激活账号、设置邮箱、连上校园 WiFi？", "expected_doc_ids": ["nju-it-auth-activate", "nju-it-email", "nju-it-wifi"], "should_refuse": false, "category": "it"}
 {"id": "q-multi-085", "question": "成绩不及格，补考过了之后 GPA 怎么算？和重修有什么区别？", "expected_doc_ids": ["nju-ac-exam-makeup", "nju-ac-retake", "nju-ac-gpa"], "should_refuse": false, "category": "academic"}
 {"id": "q-multi-086", "question": "申请缓考没通过，缺考了怎么办？还能补考或重修吗？", "expected_doc_ids": ["nju-ac-exam-defer", "nju-ac-exam-makeup", "nju-ac-retake"], "should_refuse": false, "category": "academic"}
@@ -95,49 +70,33 @@
 {"id": "q-multi-095", "question": "毕业前需要打印中文和英文成绩单、在读证明，分别在哪里办？需要提前多久申请？", "expected_doc_ids": ["nju-ac-transcript", "nju-ac-transcript-en", "nju-ac-enrollment"], "should_refuse": false, "category": "academic"}
 {"id": "q-multi-096", "question": "辅修了双学位，主修专业 GPA 不够会不会影响双学位的学位授予？", "expected_doc_ids": ["nju-ac-minor", "nju-ac-gpa", "nju-ac-degree"], "should_refuse": false, "category": "academic"}
 {"id": "q-multi-097", "question": "转专业成功后，原来专业的必修课挂了还需要重修吗？新专业的培养方案里没有这门课", "expected_doc_ids": ["nju-ac-major-transfer", "nju-ac-retake", "nju-ac-graduation"], "should_refuse": false, "category": "academic"}
-{"id": "q-multi-098", "question": "成绩复核申请被拒了，但确实觉得分数不对，还有什么申诉渠道？", "expected_doc_ids": ["nju-ac-grade-review", "nju-ac-gpa"], "should_refuse": false, "category": "academic"}
-{"id": "q-multi-099", "question": "用学校邮箱注册的第三方服务（GitHub学生包等），毕业邮箱失效后怎么办？", "expected_doc_ids": ["nju-it-email", "nju-it-software-office"], "should_refuse": false, "category": "it"}
 {"id": "q-multi-100", "question": "补退选阶段退了一门课想换成另一门，但另一门也满了，有没有候补机制？", "expected_doc_ids": ["nju-ac-course-drop", "nju-ac-course-add", "nju-ac-course-select"], "should_refuse": false, "category": "academic"}
 {"id": "q-multi-101", "question": "学信网查到的 GPA 和学校教务系统显示的不一样，应该以哪个为准？找谁更正？", "expected_doc_ids": ["nju-ac-status", "nju-ac-gpa"], "should_refuse": false, "category": "academic"}
 {"id": "q-refuse-102", "question": "学校附近哪家餐馆好吃又便宜？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
 {"id": "q-refuse-103", "question": "怎么申请美国的研究生？需要什么材料？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
 {"id": "q-refuse-104", "question": "图书馆的开放时间和闭馆日是什么？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
 {"id": "q-refuse-105", "question": "南京大学的校训是什么？有什么含义？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
-{"id": "q-refuse-106", "question": "学校附近哪里有打印店？价格怎么样？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
-{"id": "q-refuse-107", "question": "怎么申请国家奖学金？需要什么条件？", "expected_doc_ids": ["nju-stu-scholarship"], "should_refuse": false, "category": "student"}
 {"id": "q-refuse-108", "question": "最近的地铁站离学校哪个门最近？怎么走过去？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
-{"id": "q-refuse-109", "question": "南大化学系哪位教授的课最好过？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
 {"id": "q-refuse-110", "question": "学校里的 ATM 机在哪儿？支持哪些银行？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
 {"id": "q-refuse-111", "question": "2026 年南京大学在全国排名第几？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
 {"id": "q-refuse-112", "question": "怎么联系校长办公室？校长邮箱是多少？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
 {"id": "q-refuse-113", "question": "学校发的被子质量怎么样？需要自己带吗？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
 {"id": "q-refuse-114", "question": "南大和北大哪个好？为什么？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
 {"id": "q-refuse-115", "question": "怎么加入学生会？有哪些部门？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
-{"id": "q-refuse-116", "question": "学校里有哪些社团？怎么报名参加？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
 {"id": "q-fin-117", "question": "学费怎么交？可以用微信或支付宝吗？", "expected_doc_ids": ["nju-fin-tuition"], "should_refuse": false, "category": "finance"}
-{"id": "q-fin-118", "question": "学费迟交了有什么影响？会不会被注销学籍？", "expected_doc_ids": ["nju-fin-tuition"], "should_refuse": false, "category": "finance"}
-{"id": "q-fin-119", "question": "住宿费包含在学费里吗？还是单独交？", "expected_doc_ids": ["nju-fin-tuition"], "should_refuse": false, "category": "finance"}
 {"id": "q-intl-120", "question": "出国交换期间南大的学籍状态是什么？算不算休学？", "expected_doc_ids": ["nju-ac-exchange-record", "nju-intl-visa"], "should_refuse": false, "category": "international"}
 {"id": "q-intl-121", "question": "国际学生怎么激活统一身份认证？需要护照吗？", "expected_doc_ids": ["nju-it-auth-activate"], "should_refuse": false, "category": "international"}
-{"id": "q-intl-122", "question": "留学生宿舍怎么申请？和国际交流学生住一起吗？", "expected_doc_ids": ["nju-intl-housing"], "should_refuse": false, "category": "international"}
-{"id": "q-it-123", "question": "正版软件的授权到期了怎么续期？", "expected_doc_ids": ["nju-it-software-office", "nju-it-software-matlab"], "should_refuse": false, "category": "it"}
 {"id": "q-stu-124", "question": "学生证丢了怎么补办？需要什么材料？", "expected_doc_ids": ["nju-stu-student-id"], "should_refuse": false, "category": "student"}
 {"id": "q-stu-125", "question": "校园卡丢了怎么挂失？里面的钱能找回吗？", "expected_doc_ids": ["nju-stu-card-reissue"], "should_refuse": false, "category": "student"}
-{"id": "q-stu-126", "question": "医保报销的流程是怎样的？校医院看不了要去外面医院怎么报销？", "expected_doc_ids": ["nju-stu-insurance", "nju-stu-clinic"], "should_refuse": false, "category": "student"}
 {"id": "q-it-127", "question": "邮箱登录不了怎么办，先查密码还是先查账号状态？", "expected_doc_ids": ["nju-it-auth-password", "nju-it-auth-login"], "should_refuse": false, "category": "it"}
 {"id": "q-it-128", "question": "手机换号后怎么重置学校邮箱密码？", "expected_doc_ids": ["nju-it-auth-password", "nju-it-email"], "should_refuse": false, "category": "it"}
 {"id": "q-it-129", "question": "Outlook 收学校邮箱时要怎么配置？", "expected_doc_ids": ["nju-it-email-client", "nju-it-email"], "should_refuse": false, "category": "it"}
 {"id": "q-it-130", "question": "信息门户和手机 App 都能做哪些事情？", "expected_doc_ids": ["nju-it-portal", "nju-it-mobile-app"], "should_refuse": false, "category": "it"}
-{"id": "q-it-131", "question": "Office 和 MATLAB 的学校授权分别怎么申请？", "expected_doc_ids": ["nju-it-software-office", "nju-it-software-matlab"], "should_refuse": false, "category": "it"}
 {"id": "q-it-132", "question": "宿舍网络断了是先看 WiFi 还是有线网？要怎么报修？", "expected_doc_ids": ["nju-it-wifi", "nju-it-wired", "nju-it-repair"], "should_refuse": false, "category": "it"}
-{"id": "q-it-133", "question": "校外访问知网时 VPN 还要配什么？", "expected_doc_ids": ["nju-it-vpn", "nju-stu-lib-database"], "should_refuse": false, "category": "it"}
 {"id": "q-it-134", "question": "网盘和移动校园 App 有没有关联入口？", "expected_doc_ids": ["nju-it-cloud", "nju-it-mobile-app"], "should_refuse": false, "category": "it"}
 {"id": "q-it-135", "question": "遇到钓鱼邮件后除了改密码还要做什么？", "expected_doc_ids": ["nju-it-security", "nju-it-auth-password"], "should_refuse": false, "category": "it"}
-{"id": "q-academic-136", "question": "选课系统里怎么补选和退课？", "expected_doc_ids": ["nju-ac-course-select", "nju-ac-course-add", "nju-ac-course-drop"], "should_refuse": false, "category": "academic"}
 {"id": "q-academic-137", "question": "选课满了但想换课，先退还是先补？", "expected_doc_ids": ["nju-ac-course-drop", "nju-ac-course-add"], "should_refuse": false, "category": "academic"}
 {"id": "q-academic-138", "question": "成绩查询和成绩复核分别去哪办？", "expected_doc_ids": ["nju-ac-grade-query", "nju-ac-grade-review"], "should_refuse": false, "category": "academic"}
-{"id": "q-academic-139", "question": "重修会怎么影响 GPA？", "expected_doc_ids": ["nju-ac-gpa", "nju-ac-retake"], "should_refuse": false, "category": "academic"}
-{"id": "q-academic-140", "question": "缓考没过，补考资格还在吗？", "expected_doc_ids": ["nju-ac-exam-defer", "nju-ac-exam-makeup"], "should_refuse": false, "category": "academic"}
 {"id": "q-academic-141", "question": "中文成绩单和英文成绩单分别怎么申请？", "expected_doc_ids": ["nju-ac-transcript", "nju-ac-transcript-en"], "should_refuse": false, "category": "academic"}
 {"id": "q-academic-142", "question": "在读证明和学籍证明有什么区别？", "expected_doc_ids": ["nju-ac-enrollment", "nju-ac-status"], "should_refuse": false, "category": "academic"}
 {"id": "q-academic-143", "question": "转专业和辅修的要求有什么不同？", "expected_doc_ids": ["nju-ac-major-transfer", "nju-ac-minor"], "should_refuse": false, "category": "academic"}
@@ -146,10 +105,7 @@
 {"id": "q-academic-146", "question": "出国交流学分认定和交流备案要办哪些手续？", "expected_doc_ids": ["nju-ac-exchange", "nju-ac-exchange-record"], "should_refuse": false, "category": "academic"}
 {"id": "q-student-147", "question": "校园卡丢了后怎么挂失、怎么补办？", "expected_doc_ids": ["nju-stu-card-reissue"], "should_refuse": false, "category": "student"}
 {"id": "q-student-148", "question": "校园卡充值失败去哪查？", "expected_doc_ids": ["nju-stu-card-charge"], "should_refuse": false, "category": "student"}
-{"id": "q-student-149", "question": "图书馆借书和研讨间预约分别怎么用？", "expected_doc_ids": ["nju-stu-library", "nju-stu-lib-room"], "should_refuse": false, "category": "student"}
-{"id": "q-student-150", "question": "宿舍报修和学校 IT 报修有什么区别？", "expected_doc_ids": ["nju-stu-dorm-repair", "nju-it-repair"], "should_refuse": false, "category": "student"}
 {"id": "q-student-151", "question": "请病假和心理咨询分别找谁？", "expected_doc_ids": ["nju-stu-leave", "nju-stu-counseling"], "should_refuse": false, "category": "student"}
-{"id": "q-student-152", "question": "奖学金和助学金怎么区分？", "expected_doc_ids": ["nju-stu-scholarship", "nju-stu-grant"], "should_refuse": false, "category": "student"}
 {"id": "q-student-153", "question": "学生证补办和年检在哪里办？", "expected_doc_ids": ["nju-stu-student-id"], "should_refuse": false, "category": "student"}
 {"id": "q-student-154", "question": "校医院看病和医保报销怎么衔接？", "expected_doc_ids": ["nju-stu-clinic", "nju-stu-insurance"], "should_refuse": false, "category": "student"}
 {"id": "q-student-155", "question": "毕业后档案和就业手续分别怎么办？", "expected_doc_ids": ["nju-stu-archive", "nju-stu-employment"], "should_refuse": false, "category": "student"}
@@ -157,24 +113,16 @@
 {"id": "q-fin-157", "question": "学费和住宿费分别怎么缴，忘了缴费会怎样？", "expected_doc_ids": ["nju-fin-tuition"], "should_refuse": false, "category": "finance"}
 {"id": "q-fin-158", "question": "支付宝缴学费失败怎么办？", "expected_doc_ids": ["nju-fin-tuition"], "should_refuse": false, "category": "finance"}
 {"id": "q-fin-159", "question": "住宿费是和学费一起收还是单独收？", "expected_doc_ids": ["nju-fin-tuition"], "should_refuse": false, "category": "finance"}
-{"id": "q-fin-160", "question": "学费延迟缴纳会影响注册吗？", "expected_doc_ids": ["nju-fin-tuition"], "should_refuse": false, "category": "finance"}
 {"id": "q-fin-161", "question": "已经缴的学费怎么申请退费？", "expected_doc_ids": ["nju-fin-refund"], "should_refuse": false, "category": "finance"}
 {"id": "q-fin-162", "question": "宿舍水电费怎么充值和查询余额？", "expected_doc_ids": ["nju-fin-utility"], "should_refuse": false, "category": "finance"}
 {"id": "q-fin-163", "question": "电费欠费断电后还能怎么恢复？", "expected_doc_ids": ["nju-fin-utility"], "should_refuse": false, "category": "finance"}
-{"id": "q-fin-164", "question": "申请助学贷款后学费怎么处理？", "expected_doc_ids": ["nju-fin-tuition"], "should_refuse": false, "category": "finance"}
-{"id": "q-fin-165", "question": "缴费后如何确认自己已经完成注册？", "expected_doc_ids": ["nju-fin-tuition"], "should_refuse": false, "category": "finance"}
 {"id": "q-intl-166", "question": "出国交换前学校能开什么在读证明和成绩单？", "expected_doc_ids": ["nju-intl-visa", "nju-ac-transcript-en", "nju-ac-enrollment"], "should_refuse": false, "category": "international"}
 {"id": "q-intl-167", "question": "留学签证材料里学校证明和英文成绩单怎么开？", "expected_doc_ids": ["nju-intl-visa", "nju-ac-transcript-en"], "should_refuse": false, "category": "international"}
 {"id": "q-intl-168", "question": "国际学生激活账号需要哪些证件？", "expected_doc_ids": ["nju-it-auth-activate"], "should_refuse": false, "category": "international"}
-{"id": "q-intl-169", "question": "国际学生宿舍申请流程是什么？", "expected_doc_ids": ["nju-intl-housing"], "should_refuse": false, "category": "international"}
-{"id": "q-intl-170", "question": "交流生备案和课程认定怎么操作？", "expected_doc_ids": ["nju-ac-exchange-record", "nju-ac-exchange"], "should_refuse": false, "category": "international"}
 {"id": "q-intl-171", "question": "办理护照时学校能开什么证明？", "expected_doc_ids": ["nju-intl-passport", "nju-ac-enrollment"], "should_refuse": false, "category": "international"}
 {"id": "q-intl-172", "question": "交换期间学校学籍状态怎么记录？", "expected_doc_ids": ["nju-ac-exchange-record", "nju-ac-status"], "should_refuse": false, "category": "international"}
-{"id": "q-intl-173", "question": "交换生回来后怎么补交课程认定材料？", "expected_doc_ids": ["nju-ac-exchange-record", "nju-ac-transcript-en", "nju-ac-enrollment"], "should_refuse": false, "category": "international"}
 {"id": "q-refuse-174", "question": "学校附近哪家奶茶店最好喝？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
-{"id": "q-refuse-175", "question": "哪个老师最给分？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
 {"id": "q-refuse-176", "question": "南大今年全国排名第几？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
 {"id": "q-refuse-177", "question": "图书馆晚上几点关门？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
 {"id": "q-refuse-178", "question": "学校附近哪个门口打车最方便？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
-{"id": "q-refuse-179", "question": "怎么加入学生会外联部？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}
 {"id": "q-refuse-180", "question": "学校食堂哪家最好吃？", "expected_doc_ids": [], "should_refuse": true, "category": "refusal"}

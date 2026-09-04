@@ -48,7 +48,11 @@ class CampusKBRAG:
             }
 
         search_query = rewrite_query(normalized) if self.config.get("retrieval", {}).get("query_rewrite", True) else normalized
-        retrieved = self.retriever.search(search_query, top_k=top_k)
+        retrieved = self.retriever.search(
+            normalized,
+            top_k=top_k,
+            sparse_query=search_query,
+        )
         evidence, refusal_reason = self._filter_low_confidence(retrieved)
         answer = self.generator.generate(normalized, evidence)
         return {
@@ -77,22 +81,35 @@ class CampusKBRAG:
         refusal_doc_ids = set(prompt_cfg.get("refusal_doc_ids", []))
         if retrieved[0].get("doc_id") in refusal_doc_ids:
             return [], "sentinel_document"
-        top = retrieved[0]
+        filtered = [
+            item for item in retrieved if item.get("doc_id") not in refusal_doc_ids
+        ]
+        if not filtered:
+            return [], "sentinel_document"
+        top = filtered[0]
         ce_cfg = self.config.get("retrieval", {}).get("cross_encoder", {})
         if ce_cfg.get("enabled") and top.get("cross_encoder_score") is not None:
             ce_threshold = float(prompt_cfg.get("refusal_ce_threshold", 0.0))
             if float(top["cross_encoder_score"]) >= ce_threshold:
-                return retrieved, None
-            # Topic routing already put the official page first; dense cosine is
-            # a second gate so a negative CE logit does not false-refuse it.
-            if top.get("topic_preferred") and float(top.get("dense_score") or 0.0) >= 0.50:
-                return retrieved, None
+                return filtered, None
+            # A strong dense match is useful evidence when the CE model is
+            # overly conservative on short Chinese campus queries.
+            dense_fallback_threshold = float(
+                prompt_cfg.get("refusal_dense_fallback_threshold", 0.43)
+            )
+            fallback_pool = filtered[:3]
+            best_dense = max(
+                float(item.get("dense_score") or item.get("score") or 0.0)
+                for item in fallback_pool
+            )
+            if best_dense >= dense_fallback_threshold:
+                return filtered, None
             return [], "low_confidence"
         threshold = float(prompt_cfg.get("refusal_threshold", 0.18))
         top_score = float(top.get("dense_score", top.get("score", 0.0)))
         if top_score < threshold:
             return [], "low_confidence"
-        return retrieved, None
+        return filtered, None
 
     @staticmethod
     def _citations(evidence: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

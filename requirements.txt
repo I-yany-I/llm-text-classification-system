@@ -4,6 +4,7 @@ gradio
 numpy
 peft
 PyYAML
+jieba
 rank_bm25
 sentence-transformers
 torch
